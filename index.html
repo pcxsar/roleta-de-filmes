@@ -720,6 +720,155 @@
     color:var(--violet);
   }
 
+  /* ---------- Dropdown de categoria (reutilizável) ---------- */
+  .genre-dropdown{position:relative; width:100%; max-width:260px;}
+  .genre-dropdown-btn{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--text);
+    cursor:pointer;
+    transition:.15s;
+  }
+  .genre-dropdown-btn:hover{border-color:var(--magenta);}
+  .genre-dropdown.open .genre-dropdown-btn{border-color:var(--magenta);}
+  .gd-arrow{color:var(--muted); font-size:10px; transition:transform .2s;}
+  .genre-dropdown.open .gd-arrow{transform:rotate(180deg);}
+  .genre-dropdown-menu{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:0;
+    display:none;
+    flex-direction:column;
+    gap:2px;
+    background:linear-gradient(180deg, var(--panel-2), var(--bg-2));
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:6px;
+    max-height:280px;
+    overflow-y:auto;
+    z-index:45;
+    box-shadow:0 24px 50px -14px rgba(0,0,0,.7);
+  }
+  .genre-dropdown.open .genre-dropdown-menu{display:flex;}
+  .gd-option{
+    padding:9px 12px;
+    border-radius:9px;
+    font-size:13px;
+    color:var(--muted);
+    cursor:pointer;
+    transition:.12s;
+  }
+  .gd-option:hover{background:rgba(255,255,255,.07); color:var(--text);}
+  .gd-option.active{background:rgba(255,63,176,.16); color:var(--text); font-weight:600;}
+
+  /* ---------- Perfil (Nós) ---------- */
+  .profile-intro{max-width:520px; margin:30px auto 0; padding:0 18px; text-align:center;}
+  .profile-heart{font-size:26px; animation:profile-heartbeat 1.8s ease-in-out infinite;}
+  @keyframes profile-heartbeat{
+    0%,100%{transform:scale(1);}
+    15%{transform:scale(1.18);}
+    30%{transform:scale(1);}
+    45%{transform:scale(1.12);}
+    60%{transform:scale(1);}
+  }
+  .profile-intro p{color:var(--muted); font-size:13.5px; line-height:1.6; margin:8px 0 0;}
+
+  .profile-section{max-width:1100px; margin:38px auto 0; padding:0 18px;}
+  .profile-section-title{
+    font-family:'Unbounded',sans-serif;
+    font-size:15.5px;
+    font-weight:700;
+    margin:0 0 14px;
+    text-transform:uppercase;
+    letter-spacing:.02em;
+  }
+  .profile-empty{color:var(--muted); font-size:13px; padding:10px 2px;}
+
+  .profile-rank-row, .profile-clash-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 14px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    margin-bottom:8px;
+    animation:panel-in .4s ease both;
+  }
+  .rank-num{
+    width:26px; height:26px; min-width:26px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Unbounded',sans-serif;
+    font-weight:800;
+    font-size:12px;
+    background:rgba(255,255,255,.07);
+    color:var(--muted);
+  }
+  .rank-num.rank-1{background:linear-gradient(135deg, var(--gold), #ffe9a8); color:#3a2600;}
+  .rank-num.rank-2{background:linear-gradient(135deg, #dcdcec, #a9a9c4); color:#20202e;}
+  .rank-num.rank-3{background:linear-gradient(135deg, #dd9c5e, #b97638); color:#2e1a08;}
+  .clash-ratings{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .clash-gap{
+    flex-shrink:0;
+    font-family:'Unbounded',sans-serif;
+    font-weight:800;
+    font-size:13px;
+    padding:6px 10px;
+    border-radius:10px;
+    background:rgba(255,107,129,.15);
+    color:var(--danger);
+  }
+
+  .genre-bar-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+    animation:panel-in .4s ease both;
+  }
+  .genre-bar-label{
+    width:118px; min-width:118px;
+    font-size:12px;
+    color:var(--muted);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .genre-bar-track{
+    flex:1;
+    height:9px;
+    border-radius:99px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .genre-bar-fill{
+    height:100%;
+    border-radius:99px;
+    background:linear-gradient(90deg, var(--violet), var(--magenta));
+    transition:width .6s cubic-bezier(.4,0,.2,1);
+  }
+  .genre-bar-count{
+    width:22px;
+    text-align:right;
+    font-size:12px;
+    font-weight:700;
+    color:var(--text);
+    font-variant-numeric:tabular-nums;
+  }
+
   .empty-state{text-align:center; padding:50px 20px; color:var(--muted); font-size:14px; display:none;}
 
   /* ---------- Upload de capa (modal do Diário e da Roleta) ---------- */
@@ -948,8 +1097,9 @@
 
   <div class="tabs" id="tabSwitcher">
     <button class="tab-btn" data-tab="diario">📖 Diário</button>
-    <button class="tab-btn" data-tab="watchlist">🍿 Quero ver</button>
+    <button class="tab-btn" data-tab="watchlist">🍿 Ver</button>
     <button class="tab-btn" data-tab="roleta">🎰 Roleta</button>
+    <button class="tab-btn" data-tab="perfil">💑 Nós</button>
   </div>
   <!-- <div class="cloud-status" id="cloudStatus">Conectando…</div> -->
   <button class="sound-toggle" id="soundToggle" aria-label="Ativar ou desativar som">🔊</button>
@@ -988,6 +1138,7 @@
         <div class="toggle-chip" data-sort="best">Melhores notas</div>
         <div class="toggle-chip" data-sort="worst">Piores notas</div>
       </div>
+      <div id="diarioGenreFilterRow" style="margin-top:10px;"></div>
     </div>
     <div class="movie-grid" id="diarioGrid"></div>
     <div class="empty-state" id="diarioEmpty">Nenhum filme por aqui ainda. Bora adicionar o primeiro?</div>
@@ -1010,7 +1161,7 @@
         <button class="add-btn" id="addWatchlistBtn">+ Adicionar</button>
       </div>
       <input type="text" class="search" id="watchlistSearch" placeholder="Buscar filme…">
-      <div class="chip-row" id="watchlistGenreFilterRow"></div>
+      <div id="watchlistGenreFilterRow" style="margin-top:10px;"></div>
     </div>
     <div class="movie-grid" id="watchlistGrid"></div>
     <div class="empty-state" id="watchlistEmpty">Nada guardado ainda. Viu alguma indicação boa? Adiciona aqui pra não esquecer.</div>
@@ -1086,6 +1237,48 @@
   </div>
 </section>
 
+<!-- ==================== ABA: NÓS (perfil do casal) ==================== -->
+<section class="tab-panel" id="panel-perfil" hidden>
+  <div class="profile-intro">
+    <div class="profile-heart">💜</div>
+    <p>O que a gente descobriu assistindo filme atrás de filme.</p>
+  </div>
+
+  <div class="stats-row stats-4">
+    <div class="stat-tile">
+      <div class="stat-num" id="pTotal">0</div>
+      <div class="stat-lbl">Filmes juntos</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-num" id="pAvg">—</div>
+      <div class="stat-lbl">Média do casal</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-num" id="pTopGenre">—</div>
+      <div class="stat-lbl">Gênero favorito</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-num" id="pCritico">—</div>
+      <div class="stat-lbl">Mais crítico(a)</div>
+    </div>
+  </div>
+
+  <div class="profile-section">
+    <h2 class="profile-section-title">🏆 Top 5 melhores filmes</h2>
+    <div id="profileTopList"></div>
+  </div>
+
+  <div class="profile-section">
+    <h2 class="profile-section-title">🤔 Onde mais discordamos</h2>
+    <div id="profileClashList"></div>
+  </div>
+
+  <div class="profile-section" style="margin-bottom:60px;">
+    <h2 class="profile-section-title">🎬 Filmes por gênero</h2>
+    <div id="profileGenreBars"></div>
+  </div>
+</section>
+
 </main>
 
 <!-- ==================== MODAL: avaliar filme da roleta ==================== -->
@@ -1142,6 +1335,9 @@
       <div class="toggle-chip" id="whereCasa">🛋️ Casa</div>
     </div>
 
+    <span class="field-label">Categoria</span>
+    <div id="diarioGenreRow"></div>
+
     <div class="rate-row" style="margin-top:18px;">
       <label><span class="rate-dot p"></span>Nota do Paulo</label>
       <div class="rate-input-wrap">
@@ -1187,7 +1383,7 @@
     <input type="text" class="search diario-title-input" id="watchlistTitleInput" placeholder="Nome do filme">
 
     <span class="field-label">Categoria</span>
-    <div class="chip-row" id="watchlistGenreRow" style="padding-top:0;"></div>
+    <div id="watchlistGenreRow"></div>
 
     <span class="field-label">Sobre o que é / por que quer ver</span>
     <textarea class="diario-textarea" id="watchlistDescInput" rows="4" placeholder="Do que se trata, onde viu a indicação…"></textarea>
@@ -1375,6 +1571,89 @@ function formatNum(n){
   return String(rounded).replace('.', ',');
 }
 const posterPlaceholderHTML = `<div class="r-poster-placeholder">🎬</div>`;
+
+/* =====================================================
+   Categorias de filme (usadas no Diário e na watchlist)
+===================================================== */
+const MOVIE_GENRES = [
+  {id:'acao', emoji:'🎬', label:'Ação'},
+  {id:'aventura', emoji:'🤠', label:'Aventura'},
+  {id:'comedia', emoji:'😂', label:'Comédia'},
+  {id:'drama', emoji:'🎭', label:'Drama'},
+  {id:'terror', emoji:'👻', label:'Terror'},
+  {id:'suspense', emoji:'🔪', label:'Suspense'},
+  {id:'ficcao', emoji:'🚀', label:'Ficção Científica'},
+  {id:'fantasia', emoji:'🐉', label:'Fantasia'},
+  {id:'romance', emoji:'💕', label:'Romance'},
+  {id:'animacao', emoji:'🎨', label:'Animação'},
+  {id:'documentario', emoji:'📽️', label:'Documentário'},
+  {id:'musical', emoji:'🎵', label:'Musical'},
+];
+function genreById(id){ return MOVIE_GENRES.find(g => g.id === id) || null; }
+
+// Fábrica de dropdown de categoria (usado como seletor em modais e como
+// filtro em listas — funciona igual em qualquer dispositivo, sem
+// depender de scroll horizontal por gesto).
+function createGenreDropdown(mountEl, opts){
+  const { allLabel, onSelect } = opts;
+  mountEl.innerHTML = `
+    <div class="genre-dropdown">
+      <button type="button" class="genre-dropdown-btn">
+        <span class="gd-label">${escapeHtml(allLabel)}</span>
+        <span class="gd-arrow">▾</span>
+      </button>
+      <div class="genre-dropdown-menu"></div>
+    </div>`;
+  const root = mountEl.querySelector('.genre-dropdown');
+  const btn = root.querySelector('.genre-dropdown-btn');
+  const labelEl = root.querySelector('.gd-label');
+  const menu = root.querySelector('.genre-dropdown-menu');
+  let value = null;
+
+  const allOpt = document.createElement('div');
+  allOpt.className = 'gd-option';
+  allOpt.dataset.genre = '';
+  allOpt.textContent = allLabel;
+  menu.appendChild(allOpt);
+  MOVIE_GENRES.forEach(g=>{
+    const opt = document.createElement('div');
+    opt.className = 'gd-option';
+    opt.dataset.genre = g.id;
+    opt.textContent = g.emoji + ' ' + g.label;
+    menu.appendChild(opt);
+  });
+  function setValue(v){
+    value = v || null;
+    const g = genreById(value);
+    labelEl.textContent = g ? (g.emoji + ' ' + g.label) : allLabel;
+    [...menu.children].forEach(opt=>{
+      opt.classList.toggle('active', (opt.dataset.genre || '') === (value || ''));
+    });
+  }
+  [...menu.children].forEach(opt=>{
+    opt.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      setValue(opt.dataset.genre || null);
+      root.classList.remove('open');
+      if(onSelect) onSelect(value);
+    });
+  });
+  btn.addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    document.querySelectorAll('.genre-dropdown.open').forEach(d=>{ if(d!==root) d.classList.remove('open'); });
+    root.classList.toggle('open');
+  });
+  setValue(null);
+  return { setValue, getValue: ()=>value, close: ()=> root.classList.remove('open') };
+}
+document.addEventListener('click', ()=>{
+  document.querySelectorAll('.genre-dropdown.open').forEach(d=> d.classList.remove('open'));
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape'){
+    document.querySelectorAll('.genre-dropdown.open').forEach(d=> d.classList.remove('open'));
+  }
+});
 
 /* =====================================================
    Som (sintetizado via Web Audio — sem arquivos externos)
@@ -2033,17 +2312,22 @@ let activeDiarioSort = 'recent';
 
 function renderDiario(){
   const q = diarioSearch.value.trim().toLowerCase();
-  const filtered = diario.filter(e => !q || e.title.toLowerCase().includes(q));
+  const genreFilter = diarioGenreFilter.getValue();
+  const filtered = diario
+    .filter(e => !q || e.title.toLowerCase().includes(q))
+    .filter(e => !genreFilter || e.genre === genreFilter);
   const sorted = sortDiario(filtered, activeDiarioSort);
   diarioGrid.innerHTML = '';
 
   sorted.forEach(e=>{
+    const g = genreById(e.genre);
     const card = document.createElement('div');
     card.className = 'movie-card';
     card.innerHTML = `
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
+        ${g ? `<div class="m-genre-chip" style="display:inline-block; margin-top:3px;">${g.emoji} ${escapeHtml(g.label)}</div>` : ''}
       </div>
       <div class="m-ratings">
         ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
@@ -2082,6 +2366,11 @@ document.querySelectorAll('#diarioSortRow .toggle-chip').forEach(chip=>{
   });
 });
 diarioSearch.addEventListener('input', renderDiario);
+
+const diarioGenreFilter = createGenreDropdown(document.getElementById('diarioGenreFilterRow'), {
+  allLabel: 'Todos os gêneros',
+  onSelect: ()=> renderDiario()
+});
 
 /* =====================================================
    Modal de adicionar/editar filme do Diário
@@ -2176,12 +2465,18 @@ function updateWhereChips(){
 whereCinemaChip.addEventListener('click', ()=>{ selectedWhere = selectedWhere === 'Cinema' ? null : 'Cinema'; updateWhereChips(); });
 whereCasaChip.addEventListener('click', ()=>{ selectedWhere = selectedWhere === 'Casa' ? null : 'Casa'; updateWhereChips(); });
 
+const diarioGenrePicker = createGenreDropdown(document.getElementById('diarioGenreRow'), {
+  allLabel: 'Sem categoria',
+  onSelect: ()=>{}
+});
+
 function openDiarioModal(entry, prefill){
   diarioEditId = entry ? entry.id : null;
   diarioModalEyebrow.textContent = entry ? 'Editar filme' : 'Novo filme';
   diarioTitleInput.value = entry ? entry.title : ((prefill && prefill.title) || '');
   selectedWhere = entry ? entry.where : null;
   updateWhereChips();
+  diarioGenrePicker.setValue(entry ? (entry.genre || null) : ((prefill && prefill.genre) || null));
   diarioRatePaulo.value = (entry && entry.notaPaulo!=null) ? entry.notaPaulo : '';
   diarioRateJulia.value = (entry && entry.notaJulia!=null) ? entry.notaJulia : '';
   diarioObsInput.value = entry ? (entry.obs || '') : '';
@@ -2214,6 +2509,7 @@ diarioModalSave.addEventListener('click', ()=>{
   const p = clampRating(diarioRatePaulo.value);
   const j = clampRating(diarioRateJulia.value);
   const obs = diarioObsInput.value.trim();
+  const genre = diarioGenrePicker.getValue();
 
   let entryId = diarioEditId;
   let addedAt = Date.now();
@@ -2233,9 +2529,10 @@ diarioModalSave.addEventListener('click', ()=>{
     entry.notaJulia = j;
     entry.obs = obs;
     entry.poster = poster;
+    entry.genre = genre;
   } else {
     entryId = 'd'+Date.now();
-    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster });
+    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genre });
   }
   saveDiarioLocal();
 
@@ -2245,7 +2542,7 @@ diarioModalSave.addEventListener('click', ()=>{
   updateDiarioStats();
 
   if(cloudEnabled){
-    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster })
+    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genre })
       .catch(err => logCloudError('Falha ao sincronizar filme do diário', err));
   }
 
@@ -2277,22 +2574,6 @@ diarioModalOverlay.addEventListener('click', (e)=>{ if(e.target === diarioModalO
    QUERO VER — filmes indicados que ainda não assistiram
 ===================================================== */
 const WATCHLIST_STORAGE_KEY = 'cinema-pj-watchlist';
-
-const WATCHLIST_GENRES = [
-  {id:'acao', emoji:'🎬', label:'Ação'},
-  {id:'aventura', emoji:'🤠', label:'Aventura'},
-  {id:'comedia', emoji:'😂', label:'Comédia'},
-  {id:'drama', emoji:'🎭', label:'Drama'},
-  {id:'terror', emoji:'👻', label:'Terror'},
-  {id:'suspense', emoji:'🔪', label:'Suspense'},
-  {id:'ficcao', emoji:'🚀', label:'Ficção Científica'},
-  {id:'fantasia', emoji:'🐉', label:'Fantasia'},
-  {id:'romance', emoji:'💕', label:'Romance'},
-  {id:'animacao', emoji:'🎨', label:'Animação'},
-  {id:'documentario', emoji:'📽️', label:'Documentário'},
-  {id:'musical', emoji:'🎵', label:'Musical'},
-];
-function genreById(id){ return WATCHLIST_GENRES.find(g => g.id === id) || null; }
 
 function loadWatchlist(){
   try{
@@ -2326,51 +2607,24 @@ const watchlistGenreRow = document.getElementById('watchlistGenreRow');
 const watchlistGenreFilterRow = document.getElementById('watchlistGenreFilterRow');
 
 let watchlistEditId = null;
-let selectedWatchlistGenre = null; // usado no modal de adicionar/editar
-let activeWatchlistGenreFilter = null; // usado no filtro da lista ("mood do dia")
 
-// Chips de categoria dentro do modal (seleção única)
-WATCHLIST_GENRES.forEach(g=>{
-  const chip = document.createElement('div');
-  chip.className = 'toggle-chip';
-  chip.textContent = g.emoji + ' ' + g.label;
-  chip.dataset.genre = g.id;
-  chip.addEventListener('click', ()=>{
-    selectedWatchlistGenre = selectedWatchlistGenre === g.id ? null : g.id;
-    updateWatchlistGenreChips();
-  });
-  watchlistGenreRow.appendChild(chip);
+// Dropdown de categoria dentro do modal (seleção única, opcional)
+const watchlistGenrePicker = createGenreDropdown(watchlistGenreRow, {
+  allLabel: 'Sem categoria',
+  onSelect: ()=>{}
 });
-function updateWatchlistGenreChips(){
-  [...watchlistGenreRow.children].forEach(chip=>{
-    chip.classList.toggle('active', chip.dataset.genre === selectedWatchlistGenre);
-  });
-}
 
-// Chips de filtro por categoria na lista ("mood do dia")
-WATCHLIST_GENRES.forEach(g=>{
-  const chip = document.createElement('div');
-  chip.className = 'toggle-chip';
-  chip.textContent = g.emoji + ' ' + g.label;
-  chip.dataset.genre = g.id;
-  chip.addEventListener('click', ()=>{
-    activeWatchlistGenreFilter = activeWatchlistGenreFilter === g.id ? null : g.id;
-    updateWatchlistGenreFilterChips();
-    renderWatchlist();
-  });
-  watchlistGenreFilterRow.appendChild(chip);
+// Dropdown de filtro por categoria na lista ("mood do dia")
+const watchlistGenreFilter = createGenreDropdown(watchlistGenreFilterRow, {
+  allLabel: 'Todos os gêneros',
+  onSelect: ()=> renderWatchlist()
 });
-function updateWatchlistGenreFilterChips(){
-  [...watchlistGenreFilterRow.children].forEach(chip=>{
-    chip.classList.toggle('active', chip.dataset.genre === activeWatchlistGenreFilter);
-  });
-}
 
 function renderWatchlist(){
   const q = watchlistSearch.value.trim().toLowerCase();
   const filtered = watchlist
     .filter(e => !q || e.title.toLowerCase().includes(q))
-    .filter(e => !activeWatchlistGenreFilter || e.genre === activeWatchlistGenreFilter)
+    .filter(e => { const g = watchlistGenreFilter.getValue(); return !g || e.genre === g; })
     .sort((a,b) => b.addedAt - a.addedAt);
   watchlistGrid.innerHTML = '';
 
@@ -2406,8 +2660,7 @@ function openWatchlistModal(entry){
   watchlistModalEyebrow.textContent = entry ? 'Editar item' : 'Novo filme pra ver';
   watchlistTitleInput.value = entry ? entry.title : '';
   watchlistDescInput.value = entry ? (entry.description || '') : '';
-  selectedWatchlistGenre = entry ? (entry.genre || null) : null;
-  updateWatchlistGenreChips();
+  watchlistGenrePicker.setValue(entry ? (entry.genre || null) : null);
   watchlistModalRemove.style.display = entry ? 'block' : 'none';
   watchlistMarkWatched.style.display = entry ? 'block' : 'none';
   watchlistModalOverlay.classList.add('open');
@@ -2427,6 +2680,7 @@ watchlistModalSave.addEventListener('click', ()=>{
   if(!title){ watchlistTitleInput.focus(); return; }
   playClick();
   const description = watchlistDescInput.value.trim();
+  const genre = watchlistGenrePicker.getValue();
 
   let entryId = watchlistEditId;
   let addedAt = Date.now();
@@ -2443,10 +2697,10 @@ watchlistModalSave.addEventListener('click', ()=>{
     entry.title = title;
     entry.description = description;
     entry.poster = poster;
-    entry.genre = selectedWatchlistGenre;
+    entry.genre = genre;
   } else {
     entryId = 'w'+Date.now();
-    watchlist.push({ id:entryId, title, description, addedAt, poster, genre:selectedWatchlistGenre });
+    watchlist.push({ id:entryId, title, description, addedAt, poster, genre });
   }
   saveWatchlistLocal();
   closeWatchlistModal();
@@ -2454,7 +2708,7 @@ watchlistModalSave.addEventListener('click', ()=>{
   updateWatchlistStats();
 
   if(cloudEnabled){
-    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genre:selectedWatchlistGenre })
+    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genre })
       .catch(err => logCloudError('Falha ao sincronizar item da watchlist', err));
   }
 });
@@ -2484,7 +2738,7 @@ watchlistMarkWatched.addEventListener('click', ()=>{
   playClick();
   convertingWatchlistId = entry.id;
   closeWatchlistModal();
-  openDiarioModal(null, { title: entry.title, poster: entry.poster });
+  openDiarioModal(null, { title: entry.title, poster: entry.poster, genre: entry.genre });
 });
 
 watchlistModalClose.addEventListener('click', closeWatchlistModal);
@@ -2499,13 +2753,157 @@ document.addEventListener('keydown', (e)=>{
 });
 
 /* =====================================================
+   NÓS — perfil do casal (estatísticas derivadas do Diário)
+===================================================== */
+function computeProfileStats(){
+  const total = diario.length;
+
+  const allRatings = [];
+  diario.forEach(e=>{
+    if(e.notaPaulo!=null) allRatings.push(e.notaPaulo);
+    if(e.notaJulia!=null) allRatings.push(e.notaJulia);
+  });
+  const avgCasal = allRatings.length ? allRatings.reduce((a,b)=>a+b,0)/allRatings.length : null;
+
+  const genreCounts = {};
+  diario.forEach(e=>{ if(e.genre) genreCounts[e.genre] = (genreCounts[e.genre]||0) + 1; });
+  const genreRanking = Object.entries(genreCounts)
+    .map(([id,count]) => ({ genre:genreById(id), count }))
+    .filter(g => g.genre)
+    .sort((a,b) => b.count - a.count);
+
+  const pRatings = diario.map(e=>e.notaPaulo).filter(n=>n!=null);
+  const jRatings = diario.map(e=>e.notaJulia).filter(n=>n!=null);
+  const avgP = pRatings.length ? pRatings.reduce((a,b)=>a+b,0)/pRatings.length : null;
+  const avgJ = jRatings.length ? jRatings.reduce((a,b)=>a+b,0)/jRatings.length : null;
+  let critico = '—';
+  if(avgP!=null && avgJ!=null){
+    if(Math.abs(avgP - avgJ) < 0.05) critico = 'Empate';
+    else critico = avgP < avgJ ? 'Paulo' : 'Julia';
+  }
+
+  const top5 = diario
+    .map(e => ({ e, media: computeMedia(e) }))
+    .filter(x => x.media != null)
+    .sort((a,b) => b.media - a.media)
+    .slice(0,5);
+
+  const clashes = diario
+    .filter(e => e.notaPaulo!=null && e.notaJulia!=null)
+    .map(e => ({ e, gap: Math.abs(e.notaPaulo - e.notaJulia) }))
+    .filter(x => x.gap > 0)
+    .sort((a,b) => b.gap - a.gap)
+    .slice(0,3);
+
+  return { total, avgCasal, genreRanking, critico, top5, clashes };
+}
+
+// Sobe um número de 0 até o valor final, de forma suave.
+function animateNumberTo(el, target){
+  const start = 0;
+  const duration = 700;
+  const startTime = performance.now();
+  function step(now){
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(start + (target - start) * eased);
+    if(t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderProfile(){
+  const stats = computeProfileStats();
+
+  animateNumberTo(document.getElementById('pTotal'), stats.total);
+  document.getElementById('pAvg').textContent = formatNum(stats.avgCasal);
+  const topGenre = stats.genreRanking[0];
+  document.getElementById('pTopGenre').textContent = topGenre ? (topGenre.genre.emoji + ' ' + topGenre.genre.label) : '—';
+  document.getElementById('pCritico').textContent = stats.critico;
+
+  const topList = document.getElementById('profileTopList');
+  topList.innerHTML = '';
+  if(!stats.top5.length){
+    topList.innerHTML = '<div class="profile-empty">Avaliem alguns filmes no Diário pra ver o ranking aqui.</div>';
+  } else {
+    stats.top5.forEach((x,i)=>{
+      const row = document.createElement('div');
+      row.className = 'profile-rank-row';
+      row.style.animationDelay = (i*0.06)+'s';
+      row.innerHTML = `
+        <div class="rank-num rank-${i+1}">${i+1}</div>
+        <div class="m-poster">${x.e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
+        <div class="m-info"><div class="m-title">${escapeHtml(x.e.title)}</div></div>
+        <div class="dc-media-badge">${formatNum(x.media)}</div>
+      `;
+      topList.appendChild(row);
+      const posterEl = row.querySelector('.m-poster');
+      if(x.e.poster){
+        posterEl.innerHTML = `<img class="m-poster-img" src="${x.e.poster}" alt="${escapeHtml(x.e.title)}" loading="lazy">`;
+      } else {
+        lazyLoadPoster(posterEl, {id:x.e.id, t:x.e.title, y:''}, 'm-poster-img');
+      }
+    });
+  }
+
+  const clashList = document.getElementById('profileClashList');
+  clashList.innerHTML = '';
+  if(!stats.clashes.length){
+    clashList.innerHTML = '<div class="profile-empty">Ainda não tem filme com nota dos dois pra comparar.</div>';
+  } else {
+    stats.clashes.forEach((x,i)=>{
+      const row = document.createElement('div');
+      row.className = 'profile-clash-row';
+      row.style.animationDelay = (i*0.06)+'s';
+      row.innerHTML = `
+        <div class="m-poster">${x.e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
+        <div class="m-info">
+          <div class="m-title">${escapeHtml(x.e.title)}</div>
+          <div class="clash-ratings">P ${formatNum(x.e.notaPaulo)} · J ${formatNum(x.e.notaJulia)}</div>
+        </div>
+        <div class="clash-gap">${formatNum(x.gap)}</div>
+      `;
+      clashList.appendChild(row);
+      const posterEl = row.querySelector('.m-poster');
+      if(x.e.poster){
+        posterEl.innerHTML = `<img class="m-poster-img" src="${x.e.poster}" alt="${escapeHtml(x.e.title)}" loading="lazy">`;
+      } else {
+        lazyLoadPoster(posterEl, {id:x.e.id, t:x.e.title, y:''}, 'm-poster-img');
+      }
+    });
+  }
+
+  const genreBars = document.getElementById('profileGenreBars');
+  genreBars.innerHTML = '';
+  if(!stats.genreRanking.length){
+    genreBars.innerHTML = '<div class="profile-empty">Marquem a categoria dos filmes no Diário pra ver a distribuição aqui.</div>';
+  } else {
+    const max = stats.genreRanking[0].count;
+    stats.genreRanking.forEach((g,i)=>{
+      const row = document.createElement('div');
+      row.className = 'genre-bar-row';
+      row.style.animationDelay = (i*0.04)+'s';
+      row.innerHTML = `
+        <div class="genre-bar-label">${g.genre.emoji} ${escapeHtml(g.genre.label)}</div>
+        <div class="genre-bar-track"><div class="genre-bar-fill" style="width:0%"></div></div>
+        <div class="genre-bar-count">${g.count}</div>
+      `;
+      genreBars.appendChild(row);
+      const fill = row.querySelector('.genre-bar-fill');
+      requestAnimationFrame(()=>{ fill.style.width = (g.count / max * 100) + '%'; });
+    });
+  }
+}
+
+/* =====================================================
    Troca de abas
 ===================================================== */
 const tabBtns = document.querySelectorAll('.tab-btn');
 const panels = {
   diario: document.getElementById('panel-diario'),
   watchlist: document.getElementById('panel-watchlist'),
-  roleta: document.getElementById('panel-roleta')
+  roleta: document.getElementById('panel-roleta'),
+  perfil: document.getElementById('panel-perfil')
 };
 const ACTIVE_TAB_KEY = 'oscar-roleta-active-tab';
 let activeTab = localStorage.getItem(ACTIVE_TAB_KEY) || 'diario';
@@ -2517,6 +2915,7 @@ function setActiveTab(tab){
   localStorage.setItem(ACTIVE_TAB_KEY, tab);
   if(tab !== 'roleta'){ fabSpin.classList.remove('visible'); }
   else { requestAnimationFrame(()=> drawWheel()); }
+  if(tab === 'perfil'){ renderProfile(); }
 }
 tabBtns.forEach(b => b.addEventListener('click', ()=>{ playClick(); setActiveTab(b.dataset.tab); }));
 
