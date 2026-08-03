@@ -259,6 +259,27 @@
   }
   .cloud-status.cloud-on{color:var(--cyan);}
   .cloud-status.cloud-off{color:var(--danger);}
+  .cloud-toast{
+    position:fixed;
+    left:50%;
+    bottom:86px;
+    transform:translateX(-50%) translateY(14px);
+    background:rgba(20,10,30,.96);
+    border:1px solid var(--danger);
+    color:var(--text);
+    font-size:12.5px;
+    line-height:1.4;
+    padding:11px 18px;
+    border-radius:12px;
+    z-index:90;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    max-width:88vw;
+    text-align:center;
+    box-shadow:0 14px 30px -10px rgba(0,0,0,.6);
+  }
+  .cloud-toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
   .sound-toggle{
     margin:12px auto 0;
     width:32px; height:32px;
@@ -1431,10 +1452,10 @@ function saveData(changedId){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(!cloudEnabled) return;
   if(changedId === undefined){
-    setDoc(roletaDocRef, { watched: data }).catch(err => console.warn('Falha ao sincronizar roleta:', err));
+    setDoc(roletaDocRef, { watched: data }).catch(err => logCloudError('Falha ao sincronizar roleta', err));
   } else {
     const value = data[changedId] !== undefined ? data[changedId] : deleteField();
-    updateDoc(roletaDocRef, { [`watched.${changedId}`]: value }).catch(err => console.warn('Falha ao sincronizar filme:', err));
+    updateDoc(roletaDocRef, { [`watched.${changedId}`]: value }).catch(err => logCloudError('Falha ao sincronizar filme', err));
   }
 }
 let data = loadData();
@@ -2225,7 +2246,7 @@ diarioModalSave.addEventListener('click', ()=>{
 
   if(cloudEnabled){
     setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster })
-      .catch(err => console.warn('Falha ao sincronizar filme do diário:', err));
+      .catch(err => logCloudError('Falha ao sincronizar filme do diário', err));
   }
 
   if(finishedConvertingId){
@@ -2245,7 +2266,7 @@ diarioModalRemove.addEventListener('click', ()=>{
   updateDiarioStats();
 
   if(cloudEnabled){
-    deleteDoc(doc(diarioColRef, removedId)).catch(err => console.warn('Falha ao remover filme no servidor:', err));
+    deleteDoc(doc(diarioColRef, removedId)).catch(err => logCloudError('Falha ao remover filme no servidor', err));
   }
 });
 
@@ -2434,7 +2455,7 @@ watchlistModalSave.addEventListener('click', ()=>{
 
   if(cloudEnabled){
     setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genre:selectedWatchlistGenre })
-      .catch(err => console.warn('Falha ao sincronizar item da watchlist:', err));
+      .catch(err => logCloudError('Falha ao sincronizar item da watchlist', err));
   }
 });
 
@@ -2446,7 +2467,7 @@ function removeWatchlistEntry(id){
   renderWatchlist();
   updateWatchlistStats();
   if(cloudEnabled){
-    deleteDoc(doc(watchlistColRef, id)).catch(err => console.warn('Falha ao remover item no servidor:', err));
+    deleteDoc(doc(watchlistColRef, id)).catch(err => logCloudError('Falha ao remover item no servidor', err));
   }
 }
 
@@ -2524,6 +2545,27 @@ function setCloudStatus(text, cls){
   if(cls) cloudStatusEl.classList.add(cls);
 }
 
+// Avisa visualmente quando uma gravação na nuvem falha (ex: regra do
+// Firestore bloqueando), pra não passar batido sem abrir o console.
+let cloudToastTimer = null;
+function showCloudError(msg){
+  let el = document.getElementById('cloudToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'cloudToast';
+    el.className = 'cloud-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = '⚠️ ' + msg;
+  el.classList.add('show');
+  clearTimeout(cloudToastTimer);
+  cloudToastTimer = setTimeout(()=> el.classList.remove('show'), 5000);
+}
+function logCloudError(action, err){
+  console.warn(action, err);
+  showCloudError('Não sincronizou com a nuvem (' + action.replace(/^Falha ao /, '') + '). Só salvou neste aparelho por enquanto.');
+}
+
 async function initCloudSync(){
   try{
     await new Promise((resolve, reject)=>{
@@ -2532,8 +2574,18 @@ async function initCloudSync(){
       }, reject);
       signInAnonymously(fbAuth).catch(reject);
     });
+  }catch(err){
+    console.warn('Falha na autenticação com o Firebase, usando modo local.', err);
+    cloudEnabled = false;
+    setCloudStatus('📴 Modo local (só neste aparelho)', 'cloud-off');
+    return;
+  }
 
-    // --- Roleta: semeia o documento único se ele ainda não existir ---
+  // Cada coleção sincroniza de forma independente: se uma falhar (ex: regra
+  // do Firestore faltando pra ela), as outras continuam funcionando normal.
+  let successCount = 0;
+
+  try{
     const roletaSnap = await getDoc(roletaDocRef);
     if(!roletaSnap.exists()){
       await setDoc(roletaDocRef, { watched: data });
@@ -2550,8 +2602,12 @@ async function initCloudSync(){
         if(idx > -1) showResult(idx, {withMedia:false});
       }
     });
+    successCount++;
+  }catch(err){
+    console.warn('Falha ao sincronizar a roleta (seguindo local só pra essa parte):', err);
+  }
 
-    // --- Diário: semeia a coleção com os filmes locais se ela estiver vazia ---
+  try{
     const diarioSnap = await getDocs(diarioColRef);
     if(diarioSnap.empty){
       const batch = writeBatch(db);
@@ -2567,8 +2623,12 @@ async function initCloudSync(){
       renderDiario();
       updateDiarioStats();
     });
+    successCount++;
+  }catch(err){
+    console.warn('Falha ao sincronizar o diário (seguindo local só pra essa parte):', err);
+  }
 
-    // --- Quero ver: semeia a coleção com os itens locais se ela estiver vazia ---
+  try{
     const watchlistSnap = await getDocs(watchlistColRef);
     if(watchlistSnap.empty && watchlist.length){
       const batch = writeBatch(db);
@@ -2584,12 +2644,18 @@ async function initCloudSync(){
       renderWatchlist();
       updateWatchlistStats();
     });
-
-    cloudEnabled = true;
-    setCloudStatus('☁️ Sincronizado entre aparelhos', 'cloud-on');
+    successCount++;
   }catch(err){
-    console.warn('Sincronização em nuvem indisponível, usando modo local.', err);
-    cloudEnabled = false;
+    console.warn('Falha ao sincronizar a watchlist (seguindo local só pra essa parte):', err);
+  }
+
+  cloudEnabled = successCount > 0;
+  if(successCount === 3){
+    setCloudStatus('☁️ Sincronizado entre aparelhos', 'cloud-on');
+  } else if(successCount > 0){
+    setCloudStatus('☁️ Sincronizado parcialmente — veja o console', 'cloud-off');
+    showCloudError('Uma parte não sincronizou com a nuvem — confira se as regras do Firestore foram publicadas.');
+  } else {
     setCloudStatus('📴 Modo local (só neste aparelho)', 'cloud-off');
   }
 }
