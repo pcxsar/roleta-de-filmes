@@ -250,6 +250,8 @@
   @media (min-width:420px){
     .tab-btn{font-size:12.5px; padding:12px 8px;}
   }
+  .tabs-sub{max-width:320px; margin:0 auto;}
+  .tabs-sub .tab-btn{padding:9px 8px; font-size:11.5px;}
   .cloud-status{
     margin:14px auto 0;
     font-size:11px;
@@ -706,18 +708,29 @@
   .m-info{min-width:0; flex:1;}
   .m-title{font-size:13.5px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .movie-card.done .m-title{color:#d6d0e6;}
-  .m-ratings{display:flex; gap:6px; flex-shrink:0;}
+  .m-ratings{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   .m-rate-chip{font-size:11px; font-weight:700; padding:3px 8px; border-radius:99px; white-space:nowrap; font-variant-numeric:tabular-nums;}
   .m-rate-chip.p{background:rgba(255,204,77,.16); color:var(--gold);}
   .m-rate-chip.j{background:rgba(255,63,176,.16); color:var(--magenta);}
+  .m-media-badge{
+    font-family:'Unbounded',sans-serif;
+    font-weight:800;
+    font-size:17px;
+    padding:5px 11px;
+    border-radius:11px;
+    background:rgba(255,204,77,.15);
+    color:var(--gold);
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .m-rate-sub{display:flex; flex-direction:column; gap:3px; align-items:flex-end;}
+  .m-rate-sub .m-rate-chip{font-size:9.5px; padding:2px 7px;}
   .m-genre-chip{
     font-size:11px;
     font-weight:600;
     padding:3px 9px;
     border-radius:99px;
     white-space:nowrap;
-    background:rgba(139,92,246,.16);
-    color:var(--violet);
   }
 
   /* ---------- Dropdown de categoria (reutilizável) ---------- */
@@ -770,7 +783,8 @@
     transition:.12s;
   }
   .gd-option:hover{background:rgba(255,255,255,.07); color:var(--text);}
-  .gd-option.active{background:rgba(255,63,176,.16); color:var(--text); font-weight:600;}
+  .gd-option.active{font-weight:600;}
+  .gd-dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; vertical-align:middle;}
 
   /* ---------- Perfil (Nós) ---------- */
   .profile-intro{max-width:520px; margin:30px auto 0; padding:0 18px; text-align:center;}
@@ -1170,6 +1184,12 @@
 
 <!-- ==================== ABA: ROLETA DO OSCAR ==================== -->
 <section class="tab-panel" id="panel-roleta" hidden>
+  <div class="tabs tabs-sub" id="rouletteModeSwitch">
+    <button class="tab-btn" data-mode="oscar">🎰 Oscar</button>
+    <button class="tab-btn" data-mode="watchlist">🍿 Nossa lista</button>
+  </div>
+
+  <div id="oscarRouletteMode">
   <div class="stats-row">
     <div class="stat-tile">
       <div class="stat-num" id="prog-total-num">56</div>
@@ -1234,6 +1254,47 @@
     </div>
     <div class="movie-grid" id="movieGrid"></div>
     <div class="empty-state" id="emptyState">Nenhum filme encontrado por aqui.</div>
+  </div>
+  </div>
+
+  <div id="watchlistRouletteMode" hidden>
+    <div class="profile-intro" style="margin-top:14px;">
+      <p>Escolha um ou mais gêneros (ou deixe todos) e gire entre os filmes que vocês guardaram pra ver.</p>
+    </div>
+    <div class="chip-row" id="wrGenreChips" style="max-width:640px; margin:10px auto 0; justify-content:center;"></div>
+    <div class="pending-hint" id="wrPoolHint" style="text-align:center; margin-top:8px;"></div>
+
+    <div id="wrHasItems">
+      <div class="stage">
+        <div class="wheel-area">
+          <div class="wheel-halo" id="wrWheelHalo"></div>
+          <svg class="pointer" viewBox="0 0 34 38" fill="none">
+            <path d="M17 38L0 8H34L17 38Z" fill="url(#pg2)"/>
+            <defs><linearGradient id="pg2" x1="17" y1="8" x2="17" y2="38"><stop stop-color="#ffcc4d"/><stop offset="1" stop-color="#ff3fb0"/></linearGradient></defs>
+            <circle cx="17" cy="6" r="5" fill="#ffcc4d" stroke="#4c1d95" stroke-width="1.5"/>
+          </svg>
+          <div class="wheel-outer">
+            <div class="wheel-spin-wrap" id="wrWheelWrap">
+              <canvas id="wrWheelCanvas"></canvas>
+            </div>
+          </div>
+          <div class="hub"></div>
+        </div>
+
+        <button class="spin-btn" id="wrSpinBtn">Girar</button>
+
+        <div class="result" id="wrResultCard">
+          <div class="r-year" id="wrGenreTag">—</div>
+          <div class="r-title" id="wrTitle">Gire para descobrir o próximo filme</div>
+          <div class="r-media" id="wrMedia"></div>
+          <div class="r-actions" id="wrActions" style="display:none;">
+            <button class="r-btn mark-ok" id="wrMarkWatched">✓ Já assisti</button>
+            <button class="r-btn" id="wrSpinAgain">🎲 Girar de novo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="empty-state" id="wrEmptyState">Nenhum filme guardado com esses gêneros ainda. Adiciona alguns na aba "Quero ver" primeiro.</div>
   </div>
 </section>
 
@@ -1576,18 +1637,18 @@ const posterPlaceholderHTML = `<div class="r-poster-placeholder">🎬</div>`;
    Categorias de filme (usadas no Diário e na watchlist)
 ===================================================== */
 const MOVIE_GENRES = [
-  {id:'acao', emoji:'🎬', label:'Ação'},
-  {id:'aventura', emoji:'🤠', label:'Aventura'},
-  {id:'comedia', emoji:'😂', label:'Comédia'},
-  {id:'drama', emoji:'🎭', label:'Drama'},
-  {id:'terror', emoji:'👻', label:'Terror'},
-  {id:'suspense', emoji:'🔪', label:'Suspense'},
-  {id:'ficcao', emoji:'🚀', label:'Ficção Científica'},
-  {id:'fantasia', emoji:'🐉', label:'Fantasia'},
-  {id:'romance', emoji:'💕', label:'Romance'},
-  {id:'animacao', emoji:'🎨', label:'Animação'},
-  {id:'documentario', emoji:'📽️', label:'Documentário'},
-  {id:'musical', emoji:'🎵', label:'Musical'},
+  {id:'acao', emoji:'🎬', label:'Ação', color:'#ff3fb0'},
+  {id:'aventura', emoji:'🤠', label:'Aventura', color:'#ff9d4d'},
+  {id:'comedia', emoji:'😂', label:'Comédia', color:'#ffe14d'},
+  {id:'drama', emoji:'🎭', label:'Drama', color:'#8b5cf6'},
+  {id:'terror', emoji:'👻', label:'Terror', color:'#ff4d4d'},
+  {id:'suspense', emoji:'🔪', label:'Suspense', color:'#a855f7'},
+  {id:'ficcao', emoji:'🚀', label:'Ficção Científica', color:'#2fe6d1'},
+  {id:'fantasia', emoji:'🐉', label:'Fantasia', color:'#5eb8ff'},
+  {id:'romance', emoji:'💕', label:'Romance', color:'#ff6fa8'},
+  {id:'animacao', emoji:'🎨', label:'Animação', color:'#4dff88'},
+  {id:'documentario', emoji:'📽️', label:'Documentário', color:'#94a3b8'},
+  {id:'musical', emoji:'🎵', label:'Musical', color:'#ffcc4d'},
 ];
 function genreById(id){ return MOVIE_GENRES.find(g => g.id === id) || null; }
 
@@ -1619,15 +1680,25 @@ function createGenreDropdown(mountEl, opts){
     const opt = document.createElement('div');
     opt.className = 'gd-option';
     opt.dataset.genre = g.id;
-    opt.textContent = g.emoji + ' ' + g.label;
+    opt.innerHTML = `<span class="gd-dot" style="background:${g.color}"></span>${g.emoji} ${escapeHtml(g.label)}`;
     menu.appendChild(opt);
   });
   function setValue(v){
     value = v || null;
     const g = genreById(value);
     labelEl.textContent = g ? (g.emoji + ' ' + g.label) : allLabel;
+    labelEl.style.color = g ? g.color : '';
     [...menu.children].forEach(opt=>{
-      opt.classList.toggle('active', (opt.dataset.genre || '') === (value || ''));
+      const active = (opt.dataset.genre || '') === (value || '');
+      opt.classList.toggle('active', active);
+      const og = genreById(opt.dataset.genre);
+      if(active && og){
+        opt.style.background = og.color + '29';
+        opt.style.color = og.color;
+      } else {
+        opt.style.background = '';
+        opt.style.color = '';
+      }
     });
   }
   [...menu.children].forEach(opt=>{
@@ -2321,17 +2392,21 @@ function renderDiario(){
 
   sorted.forEach(e=>{
     const g = genreById(e.genre);
+    const media = computeMedia(e);
     const card = document.createElement('div');
     card.className = 'movie-card';
     card.innerHTML = `
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
-        ${g ? `<div class="m-genre-chip" style="display:inline-block; margin-top:3px;">${g.emoji} ${escapeHtml(g.label)}</div>` : ''}
+        ${g ? `<div class="m-genre-chip" style="display:inline-block; margin-top:3px; background:${g.color}26; color:${g.color};">${g.emoji} ${escapeHtml(g.label)}</div>` : ''}
       </div>
       <div class="m-ratings">
-        ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
-        ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
+        ${media!=null ? `<span class="m-media-badge">${formatNum(media)}</span>` : ''}
+        <div class="m-rate-sub">
+          ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
+          ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
+        </div>
       </div>
     `;
     card.addEventListener('click', ()=> openDiarioModal(e));
@@ -2637,7 +2712,7 @@ function renderWatchlist(){
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
       </div>
-      ${g ? `<div class="m-ratings"><span class="m-genre-chip">${g.emoji} ${escapeHtml(g.label)}</span></div>` : ''}
+      ${g ? `<div class="m-ratings"><span class="m-genre-chip" style="background:${g.color}26; color:${g.color};">${g.emoji} ${escapeHtml(g.label)}</span></div>` : ''}
     `;
     card.addEventListener('click', ()=> openWatchlistModal(e));
     watchlistGrid.appendChild(card);
@@ -2650,6 +2725,7 @@ function renderWatchlist(){
   });
 
   watchlistEmpty.style.display = filtered.length===0 ? 'block' : 'none';
+  if(typeof rouletteMode !== 'undefined' && rouletteMode === 'watchlist'){ renderWatchlistRoulette(); }
 }
 function updateWatchlistStats(){
   document.getElementById('wTotal').textContent = watchlist.length;
@@ -2753,6 +2829,202 @@ document.addEventListener('keydown', (e)=>{
 });
 
 /* =====================================================
+   ROLETA — alternância entre modo Oscar e modo "Nossa lista"
+===================================================== */
+const rouletteModeBtns = document.querySelectorAll('#rouletteModeSwitch .tab-btn');
+const oscarRouletteMode = document.getElementById('oscarRouletteMode');
+const watchlistRouletteMode = document.getElementById('watchlistRouletteMode');
+let rouletteMode = 'oscar';
+
+function setRouletteMode(mode){
+  rouletteMode = mode;
+  rouletteModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  oscarRouletteMode.hidden = mode !== 'oscar';
+  watchlistRouletteMode.hidden = mode !== 'watchlist';
+  if(mode === 'watchlist'){
+    renderWatchlistRoulette();
+  } else {
+    requestAnimationFrame(()=> drawWheel());
+  }
+}
+rouletteModeBtns.forEach(b => b.addEventListener('click', ()=>{ playClick(); setRouletteMode(b.dataset.mode); }));
+setRouletteMode('oscar');
+
+/* =====================================================
+   ROLETA "NOSSA LISTA" — sorteia entre itens da watchlist,
+   filtrando por um ou mais gêneros escolhidos na hora.
+===================================================== */
+const wrGenreChipsEl = document.getElementById('wrGenreChips');
+const wrPoolHint = document.getElementById('wrPoolHint');
+const wrHasItems = document.getElementById('wrHasItems');
+const wrEmptyState = document.getElementById('wrEmptyState');
+const wrWheelCanvas = document.getElementById('wrWheelCanvas');
+const wrWheelCtx = wrWheelCanvas.getContext('2d');
+const wrWheelWrap = document.getElementById('wrWheelWrap');
+const wrWheelHalo = document.getElementById('wrWheelHalo');
+const wrSpinBtn = document.getElementById('wrSpinBtn');
+const wrResultCard = document.getElementById('wrResultCard');
+const wrGenreTag = document.getElementById('wrGenreTag');
+const wrTitle = document.getElementById('wrTitle');
+const wrMedia = document.getElementById('wrMedia');
+const wrActions = document.getElementById('wrActions');
+const wrMarkWatched = document.getElementById('wrMarkWatched');
+const wrSpinAgain = document.getElementById('wrSpinAgain');
+const wrHub = watchlistRouletteMode.querySelector('.hub');
+
+let wrSelectedGenres = new Set();
+let wrPool = [];
+let wrCurrentRotation = 0;
+let wrSpinning = false;
+let wrCurrentPick = null;
+
+MOVIE_GENRES.forEach(g=>{
+  const chip = document.createElement('div');
+  chip.className = 'toggle-chip';
+  chip.textContent = g.emoji + ' ' + g.label;
+  chip.dataset.genre = g.id;
+  chip.addEventListener('click', ()=>{
+    if(wrSelectedGenres.has(g.id)) wrSelectedGenres.delete(g.id);
+    else wrSelectedGenres.add(g.id);
+    chip.classList.toggle('active');
+    if(chip.classList.contains('active')){
+      chip.style.background = g.color + '29';
+      chip.style.borderColor = g.color;
+      chip.style.color = g.color;
+    } else {
+      chip.style.background = '';
+      chip.style.borderColor = '';
+      chip.style.color = '';
+    }
+    renderWatchlistRoulette();
+  });
+  wrGenreChipsEl.appendChild(chip);
+});
+
+function getWatchlistPool(){
+  if(wrSelectedGenres.size === 0) return watchlist.slice();
+  return watchlist.filter(e => e.genre && wrSelectedGenres.has(e.genre));
+}
+
+function renderWatchlistRoulette(){
+  wrPool = getWatchlistPool();
+  const total = watchlist.length;
+  if(wrSelectedGenres.size === 0){
+    wrPoolHint.textContent = total ? `${total} filme${total===1?'':'s'} na roleta` : '';
+  } else {
+    wrPoolHint.textContent = `${wrPool.length} filme${wrPool.length===1?'':'s'} com essas categorias`;
+  }
+  const hasItems = wrPool.length > 0;
+  wrHasItems.hidden = !hasItems;
+  wrEmptyState.style.display = hasItems ? 'none' : 'block';
+  if(hasItems) drawWatchlistWheel();
+}
+
+const WR_NEUTRAL_A = '#4c1d95';
+const WR_NEUTRAL_B = '#831859';
+
+function drawWatchlistWheel(){
+  const size = wrWheelWrap.clientWidth || 340;
+  if(!size) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  wrWheelCanvas.width = size*dpr;
+  wrWheelCanvas.height = size*dpr;
+  wrWheelCanvas.style.width = size+'px';
+  wrWheelCanvas.style.height = size+'px';
+  wrWheelCtx.setTransform(dpr,0,0,dpr,0,0);
+  const r = size/2;
+  wrWheelCtx.clearRect(0,0,size,size);
+
+  const n = wrPool.length || 1;
+  const angle = (Math.PI*2)/n;
+  for(let i=0;i<n;i++){
+    const start = -Math.PI/2 + i*angle;
+    const end = start + angle;
+    const item = wrPool[i];
+    const g = item ? genreById(item.genre) : null;
+    wrWheelCtx.beginPath();
+    wrWheelCtx.moveTo(r,r);
+    wrWheelCtx.arc(r,r,r,start,end);
+    wrWheelCtx.closePath();
+    wrWheelCtx.fillStyle = g ? g.color : (i%2===0 ? WR_NEUTRAL_A : WR_NEUTRAL_B);
+    wrWheelCtx.globalAlpha = g ? 0.82 : 1;
+    wrWheelCtx.fill();
+    wrWheelCtx.globalAlpha = 1;
+    wrWheelCtx.strokeStyle = 'rgba(255,255,255,0.25)';
+    wrWheelCtx.lineWidth = 1;
+    wrWheelCtx.stroke();
+  }
+
+  wrWheelCtx.beginPath();
+  wrWheelCtx.arc(r,r,r-1,0,Math.PI*2);
+  wrWheelCtx.strokeStyle = 'rgba(255,204,77,0.55)';
+  wrWheelCtx.lineWidth = 2;
+  wrWheelCtx.stroke();
+}
+window.addEventListener('resize', ()=>{ if(rouletteMode === 'watchlist' && wrPool.length) drawWatchlistWheel(); });
+
+function spinWatchlistWheel(){
+  if(wrSpinning || wrPool.length === 0) return;
+  wrSpinning = true;
+  wrSpinBtn.disabled = true;
+  wrResultCard.classList.remove('show');
+  wrWheelHalo.classList.add('spinning');
+  scheduleTicks(4600);
+
+  const targetIndex = Math.floor(Math.random()*wrPool.length);
+  const n = wrPool.length;
+  const angle = (Math.PI*2)/n;
+  const segCenterDeg = (targetIndex*angle + angle/2) * (180/Math.PI);
+  const targetMod = ((360 - segCenterDeg) % 360 + 360) % 360;
+  const extraSpins = 7 + Math.floor(Math.random()*3);
+  const curMod = ((wrCurrentRotation % 360) + 360) % 360;
+  const delta = ((targetMod - curMod) + 360) % 360;
+  wrCurrentRotation = wrCurrentRotation + extraSpins*360 + delta;
+  wrWheelWrap.style.transform = `rotate(${wrCurrentRotation}deg)`;
+
+  const onEnd = ()=>{
+    wrWheelWrap.removeEventListener('transitionend', onEnd);
+    wrSpinning = false;
+    wrSpinBtn.disabled = false;
+    wrWheelHalo.classList.remove('spinning');
+    showWatchlistResult(wrPool[targetIndex]);
+    burstConfetti(wrHub);
+    flareBurst(wrHub);
+    playChime();
+    if(navigator.vibrate) navigator.vibrate([30,40,70]);
+  };
+  wrWheelWrap.addEventListener('transitionend', onEnd);
+}
+
+function showWatchlistResult(item){
+  wrCurrentPick = item;
+  const g = genreById(item.genre);
+  wrGenreTag.textContent = g ? (g.emoji + ' ' + g.label) : 'Sem categoria';
+  wrGenreTag.style.color = g ? g.color : '';
+  wrTitle.textContent = item.title;
+  wrActions.style.display = 'flex';
+
+  const posterHtml = item.poster
+    ? `<div class="r-poster-wrap"><img class="r-poster" src="${item.poster}" alt="${escapeHtml(item.title)}"></div>`
+    : `<div class="r-poster-wrap">${posterPlaceholderHTML}</div>`;
+  const descHtml = item.description
+    ? `<p>${escapeHtml(item.description)}</p>`
+    : `<p class="r-no-info">Sem descrição guardada pra esse aqui.</p>`;
+  wrMedia.innerHTML = `${posterHtml}<div class="r-synopsis">${descHtml}</div>`;
+
+  requestAnimationFrame(()=> wrResultCard.classList.add('show'));
+}
+
+wrSpinBtn.addEventListener('click', spinWatchlistWheel);
+wrSpinAgain.addEventListener('click', ()=>{ playClick(); spinWatchlistWheel(); });
+wrMarkWatched.addEventListener('click', ()=>{
+  if(!wrCurrentPick) return;
+  playClick();
+  convertingWatchlistId = wrCurrentPick.id;
+  openDiarioModal(null, { title: wrCurrentPick.title, poster: wrCurrentPick.poster, genre: wrCurrentPick.genre });
+});
+
+/* =====================================================
    NÓS — perfil do casal (estatísticas derivadas do Diário)
 ===================================================== */
 function computeProfileStats(){
@@ -2834,7 +3106,13 @@ function renderProfile(){
         <div class="rank-num rank-${i+1}">${i+1}</div>
         <div class="m-poster">${x.e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
         <div class="m-info"><div class="m-title">${escapeHtml(x.e.title)}</div></div>
-        <div class="dc-media-badge">${formatNum(x.media)}</div>
+        <div class="m-ratings">
+          <span class="m-media-badge">${formatNum(x.media)}</span>
+          <div class="m-rate-sub">
+            ${x.e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(x.e.notaPaulo)}</span>` : ''}
+            ${x.e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(x.e.notaJulia)}</span>` : ''}
+          </div>
+        </div>
       `;
       topList.appendChild(row);
       const posterEl = row.querySelector('.m-poster');
@@ -2885,7 +3163,7 @@ function renderProfile(){
       row.style.animationDelay = (i*0.04)+'s';
       row.innerHTML = `
         <div class="genre-bar-label">${g.genre.emoji} ${escapeHtml(g.genre.label)}</div>
-        <div class="genre-bar-track"><div class="genre-bar-fill" style="width:0%"></div></div>
+        <div class="genre-bar-track"><div class="genre-bar-fill" style="width:0%; background:${g.genre.color};"></div></div>
         <div class="genre-bar-count">${g.count}</div>
       `;
       genreBars.appendChild(row);
