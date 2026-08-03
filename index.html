@@ -37,7 +37,7 @@
   html,body{margin:0;padding:0;}
   html{scroll-behavior:smooth; overflow-x:hidden; overscroll-behavior-x:none;}
   body{
-    background:var(--bg);
+    background:var(--bg) url("https://res.cloudinary.com/dam2gd3fj/image/upload/v1785772320/background-mobile_u8yeyv.png") top center / cover no-repeat scroll;
     color:var(--text);
     font-family:'Space Grotesk',sans-serif;
     min-height:100vh;
@@ -50,6 +50,13 @@
   ::selection{background:var(--magenta); color:#0a0512;}
 
   /* ---------- Ambient background: aurora blobs + grain ---------- */
+  .bg-scrim{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    pointer-events:none;
+    background:linear-gradient(180deg, rgba(6,5,18,.55) 0%, rgba(6,5,18,.78) 45%, rgba(6,5,18,.9) 100%);
+  }
   .aurora{position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;}
   .aurora span{
     position:absolute;
@@ -889,6 +896,7 @@
   }
   @media (min-width:900px){
     .wheel-area{width:420px;}
+    body{background-image:url("https://res.cloudinary.com/dam2gd3fj/image/upload/v1785772320/background_cymtga.png");}
   }
 
   /* reduced motion */
@@ -902,6 +910,7 @@
 </head>
 <body>
 
+<div class="bg-scrim"></div>
 <div class="aurora"><span></span><span></span><span></span></div>
 <div class="grain"></div>
 <div class="sparkles" id="sparkles"></div>
