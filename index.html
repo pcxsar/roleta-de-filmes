@@ -685,6 +685,15 @@
   .m-rate-chip{font-size:11px; font-weight:700; padding:3px 8px; border-radius:99px; white-space:nowrap; font-variant-numeric:tabular-nums;}
   .m-rate-chip.p{background:rgba(255,204,77,.16); color:var(--gold);}
   .m-rate-chip.j{background:rgba(255,63,176,.16); color:var(--magenta);}
+  .m-genre-chip{
+    font-size:11px;
+    font-weight:600;
+    padding:3px 9px;
+    border-radius:99px;
+    white-space:nowrap;
+    background:rgba(139,92,246,.16);
+    color:var(--violet);
+  }
 
   .empty-state{text-align:center; padding:50px 20px; color:var(--muted); font-size:14px; display:none;}
 
@@ -974,6 +983,7 @@
         <button class="add-btn" id="addWatchlistBtn">+ Adicionar</button>
       </div>
       <input type="text" class="search" id="watchlistSearch" placeholder="Buscar filme…">
+      <div class="chip-row" id="watchlistGenreFilterRow"></div>
     </div>
     <div class="movie-grid" id="watchlistGrid"></div>
     <div class="empty-state" id="watchlistEmpty">Nada guardado ainda. Viu alguma indicação boa? Adiciona aqui pra não esquecer.</div>
@@ -1148,6 +1158,9 @@
     </div>
 
     <input type="text" class="search diario-title-input" id="watchlistTitleInput" placeholder="Nome do filme">
+
+    <span class="field-label">Categoria</span>
+    <div class="chip-row" id="watchlistGenreRow" style="padding-top:0;"></div>
 
     <span class="field-label">Sobre o que é / por que quer ver</span>
     <textarea class="diario-textarea" id="watchlistDescInput" rows="4" placeholder="Do que se trata, onde viu a indicação…"></textarea>
@@ -2238,6 +2251,22 @@ diarioModalOverlay.addEventListener('click', (e)=>{ if(e.target === diarioModalO
 ===================================================== */
 const WATCHLIST_STORAGE_KEY = 'cinema-pj-watchlist';
 
+const WATCHLIST_GENRES = [
+  {id:'acao', emoji:'🎬', label:'Ação'},
+  {id:'aventura', emoji:'🤠', label:'Aventura'},
+  {id:'comedia', emoji:'😂', label:'Comédia'},
+  {id:'drama', emoji:'🎭', label:'Drama'},
+  {id:'terror', emoji:'👻', label:'Terror'},
+  {id:'suspense', emoji:'🔪', label:'Suspense'},
+  {id:'ficcao', emoji:'🚀', label:'Ficção Científica'},
+  {id:'fantasia', emoji:'🐉', label:'Fantasia'},
+  {id:'romance', emoji:'💕', label:'Romance'},
+  {id:'animacao', emoji:'🎨', label:'Animação'},
+  {id:'documentario', emoji:'📽️', label:'Documentário'},
+  {id:'musical', emoji:'🎵', label:'Musical'},
+];
+function genreById(id){ return WATCHLIST_GENRES.find(g => g.id === id) || null; }
+
 function loadWatchlist(){
   try{
     const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
@@ -2266,17 +2295,60 @@ const watchlistPosterPreview = document.getElementById('watchlistPosterPreview')
 const watchlistPosterFile = document.getElementById('watchlistPosterFile');
 const watchlistPosterClear = document.getElementById('watchlistPosterClear');
 const watchlistPoster = setupPosterPicker(watchlistPosterPreview, watchlistPosterFile, watchlistPosterClear);
+const watchlistGenreRow = document.getElementById('watchlistGenreRow');
+const watchlistGenreFilterRow = document.getElementById('watchlistGenreFilterRow');
 
 let watchlistEditId = null;
+let selectedWatchlistGenre = null; // usado no modal de adicionar/editar
+let activeWatchlistGenreFilter = null; // usado no filtro da lista ("mood do dia")
+
+// Chips de categoria dentro do modal (seleção única)
+WATCHLIST_GENRES.forEach(g=>{
+  const chip = document.createElement('div');
+  chip.className = 'toggle-chip';
+  chip.textContent = g.emoji + ' ' + g.label;
+  chip.dataset.genre = g.id;
+  chip.addEventListener('click', ()=>{
+    selectedWatchlistGenre = selectedWatchlistGenre === g.id ? null : g.id;
+    updateWatchlistGenreChips();
+  });
+  watchlistGenreRow.appendChild(chip);
+});
+function updateWatchlistGenreChips(){
+  [...watchlistGenreRow.children].forEach(chip=>{
+    chip.classList.toggle('active', chip.dataset.genre === selectedWatchlistGenre);
+  });
+}
+
+// Chips de filtro por categoria na lista ("mood do dia")
+WATCHLIST_GENRES.forEach(g=>{
+  const chip = document.createElement('div');
+  chip.className = 'toggle-chip';
+  chip.textContent = g.emoji + ' ' + g.label;
+  chip.dataset.genre = g.id;
+  chip.addEventListener('click', ()=>{
+    activeWatchlistGenreFilter = activeWatchlistGenreFilter === g.id ? null : g.id;
+    updateWatchlistGenreFilterChips();
+    renderWatchlist();
+  });
+  watchlistGenreFilterRow.appendChild(chip);
+});
+function updateWatchlistGenreFilterChips(){
+  [...watchlistGenreFilterRow.children].forEach(chip=>{
+    chip.classList.toggle('active', chip.dataset.genre === activeWatchlistGenreFilter);
+  });
+}
 
 function renderWatchlist(){
   const q = watchlistSearch.value.trim().toLowerCase();
   const filtered = watchlist
     .filter(e => !q || e.title.toLowerCase().includes(q))
+    .filter(e => !activeWatchlistGenreFilter || e.genre === activeWatchlistGenreFilter)
     .sort((a,b) => b.addedAt - a.addedAt);
   watchlistGrid.innerHTML = '';
 
   filtered.forEach(e=>{
+    const g = genreById(e.genre);
     const card = document.createElement('div');
     card.className = 'movie-card';
     card.innerHTML = `
@@ -2284,6 +2356,7 @@ function renderWatchlist(){
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
       </div>
+      ${g ? `<div class="m-ratings"><span class="m-genre-chip">${g.emoji} ${escapeHtml(g.label)}</span></div>` : ''}
     `;
     card.addEventListener('click', ()=> openWatchlistModal(e));
     watchlistGrid.appendChild(card);
@@ -2306,6 +2379,8 @@ function openWatchlistModal(entry){
   watchlistModalEyebrow.textContent = entry ? 'Editar item' : 'Novo filme pra ver';
   watchlistTitleInput.value = entry ? entry.title : '';
   watchlistDescInput.value = entry ? (entry.description || '') : '';
+  selectedWatchlistGenre = entry ? (entry.genre || null) : null;
+  updateWatchlistGenreChips();
   watchlistModalRemove.style.display = entry ? 'block' : 'none';
   watchlistMarkWatched.style.display = entry ? 'block' : 'none';
   watchlistModalOverlay.classList.add('open');
@@ -2341,9 +2416,10 @@ watchlistModalSave.addEventListener('click', ()=>{
     entry.title = title;
     entry.description = description;
     entry.poster = poster;
+    entry.genre = selectedWatchlistGenre;
   } else {
     entryId = 'w'+Date.now();
-    watchlist.push({ id:entryId, title, description, addedAt, poster });
+    watchlist.push({ id:entryId, title, description, addedAt, poster, genre:selectedWatchlistGenre });
   }
   saveWatchlistLocal();
   closeWatchlistModal();
@@ -2351,7 +2427,7 @@ watchlistModalSave.addEventListener('click', ()=>{
   updateWatchlistStats();
 
   if(cloudEnabled){
-    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster })
+    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genre:selectedWatchlistGenre })
       .catch(err => console.warn('Falha ao sincronizar item da watchlist:', err));
   }
 });
