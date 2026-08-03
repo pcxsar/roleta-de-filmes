@@ -35,7 +35,7 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
-  html{scroll-behavior:smooth;}
+  html{scroll-behavior:smooth; overflow-x:hidden; overscroll-behavior-x:none;}
   body{
     background:var(--bg);
     color:var(--text);
@@ -44,6 +44,8 @@
     -webkit-font-smoothing:antialiased;
     position:relative;
     overflow-x:hidden;
+    overscroll-behavior-x:none;
+    max-width:100vw;
   }
   ::selection{background:var(--magenta); color:#0a0512;}
 
@@ -68,62 +70,62 @@
     position:fixed; inset:-10%; z-index:1; pointer-events:none; opacity:.05; mix-blend-mode:overlay;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
   }
+  .sparkles{position:fixed; inset:0; z-index:1; pointer-events:none; overflow:hidden;}
+  .sparkle{
+    position:absolute;
+    width:3px; height:3px;
+    border-radius:50%;
+    opacity:0;
+    box-shadow:0 0 6px 1px currentColor;
+    animation:twinkle 4s ease-in-out infinite;
+  }
+  @keyframes twinkle{
+    0%,100%{opacity:0; transform:scale(.6);}
+    50%{opacity:.85; transform:scale(1.5);}
+  }
+  .flare-burst{
+    position:fixed;
+    width:10px; height:10px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(255,255,255,.95), rgba(255,204,77,.6) 40%, transparent 72%);
+    pointer-events:none;
+    z-index:79;
+    transform:translate(-50%,-50%) scale(0);
+    animation:flare-pop .65s ease-out forwards;
+  }
+  @keyframes flare-pop{
+    0%{transform:translate(-50%,-50%) scale(0); opacity:1;}
+    55%{opacity:.9;}
+    100%{transform:translate(-50%,-50%) scale(20); opacity:0;}
+  }
 
   main, header, footer{position:relative; z-index:2;}
 
-  /* ---------- Marquee ticker ---------- */
-  .marquee{
-    overflow:hidden;
-    white-space:nowrap;
-    border-bottom:1px solid var(--line);
-    background:linear-gradient(90deg, rgba(139,92,246,.14), rgba(255,63,176,.14));
-    padding:8px 0;
+  /* ---------- Faixa decorativa (sem texto) ---------- */
+  .top-flare{
+    height:3px;
+    background:linear-gradient(90deg, var(--violet), var(--magenta), var(--gold), var(--cyan), var(--violet));
+    background-size:300% 100%;
+    animation:flare-sweep 6s linear infinite;
   }
-  .marquee-track{
-    display:inline-block;
-    animation:marquee 26s linear infinite;
-    font-family:'Unbounded',sans-serif;
-    font-size:11px;
-    font-weight:600;
-    letter-spacing:.18em;
-    text-transform:uppercase;
-    color:var(--gold);
-  }
-  .marquee-track span{margin:0 10px; opacity:.9;}
-  @keyframes marquee{
-    0%{transform:translateX(0);}
-    100%{transform:translateX(-50%);}
+  @keyframes flare-sweep{
+    0%{background-position:0% 0;}
+    100%{background-position:300% 0;}
   }
 
   /* ---------- Header ---------- */
   header{
-    padding:38px 18px 22px;
+    padding:34px 18px 18px;
     text-align:center;
     max-width:760px;
     margin:0 auto;
   }
-  .eyebrow{
-    font-family:'Space Grotesk',sans-serif;
-    font-size:11.5px;
-    font-weight:600;
-    letter-spacing:.22em;
-    text-transform:uppercase;
-    color:var(--cyan);
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:6px 14px;
-    border-radius:99px;
-    border:1px solid var(--line);
-    background:var(--panel);
-  }
-  .eyebrow::before{content:"●"; color:var(--magenta); font-size:8px;}
   h1{
     font-family:'Unbounded',sans-serif;
     font-weight:900;
-    font-size:clamp(30px,9vw,58px);
-    line-height:1;
-    margin:20px 0 14px;
+    font-size:clamp(26px,8vw,46px);
+    line-height:1.05;
+    margin:0;
     letter-spacing:-.01em;
     text-transform:uppercase;
     background:linear-gradient(100deg, var(--gold) 0%, var(--magenta) 45%, var(--violet) 85%);
@@ -131,14 +133,6 @@
     background-clip:text;
     -webkit-text-fill-color:transparent;
   }
-  header p.sub{
-    color:var(--muted);
-    font-size:14.5px;
-    line-height:1.65;
-    max-width:480px;
-    margin:0 auto;
-  }
-  header p.sub b{color:var(--gold); font-weight:600;}
 
   /* ---------- Tabs ---------- */
   .tabs{
@@ -176,6 +170,21 @@
   }
   .cloud-status.cloud-on{color:var(--cyan);}
   .cloud-status.cloud-off{color:var(--danger);}
+  .sound-toggle{
+    margin:12px auto 0;
+    width:32px; height:32px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--muted);
+    font-size:13px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:.15s;
+  }
+  .sound-toggle:hover{border-color:var(--magenta); color:var(--text);}
   .tab-panel[hidden]{display:none;}
   .tab-panel{animation:panel-in .35s ease;}
   @keyframes panel-in{
@@ -191,10 +200,7 @@
     max-width:420px;
     margin:26px auto 0;
   }
-  .stats-row.stats-4{grid-template-columns:1fr 1fr;}
-  @media (min-width:560px){
-    .stats-row.stats-4{grid-template-columns:repeat(4,1fr); max-width:640px;}
-  }
+  .stats-row.stats-3{grid-template-columns:repeat(3,1fr); max-width:460px;}
   .stat-tile{
     background:var(--panel);
     border:1px solid var(--line);
@@ -213,7 +219,6 @@
     text-overflow:ellipsis;
     white-space:nowrap;
   }
-  .stat-tile.stat-fav .stat-num{font-size:13px; white-space:normal; line-height:1.25;}
   .stat-tile .stat-num em{font-style:normal; color:var(--magenta);}
   .stat-tile .stat-lbl{
     margin-top:3px;
@@ -240,8 +245,6 @@
   }
 
   /* ---------- Diário intro ---------- */
-  .diario-intro{max-width:640px; margin:34px auto 0; padding:0 18px; text-align:center;}
-  .diario-intro p{color:var(--muted); font-size:13.5px; line-height:1.6; margin:0;}
 
   /* ---------- Wheel section ---------- */
   .stage{
@@ -603,52 +606,33 @@
 
   .empty-state{text-align:center; padding:50px 20px; color:var(--muted); font-size:14px; display:none;}
 
-  /* ---------- Diário: grade de cards com pôster ---------- */
-  .diario-grid{
-    display:grid;
-    grid-template-columns:1fr;
-    gap:14px;
-    margin-top:6px;
-  }
-  @media (min-width:640px){ .diario-grid{grid-template-columns:1fr 1fr;} }
-  @media (min-width:1000px){ .diario-grid{grid-template-columns:1fr 1fr 1fr;} }
-
-  .diario-card{
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:16px;
-    overflow:hidden;
-    cursor:pointer;
-    display:flex;
-    flex-direction:column;
-    transition:transform .15s ease, border-color .15s ease;
-  }
-  .diario-card:hover{transform:translateY(-3px); border-color:var(--magenta);}
-  .dc-poster-wrap{
-    width:100%;
+  /* ---------- Upload de capa (modal do Diário e da Roleta) ---------- */
+  .poster-upload{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+  .poster-upload-preview{
+    width:72px; min-width:72px;
     aspect-ratio:2/3;
-    background:linear-gradient(160deg, var(--violet-deep), var(--magenta-deep));
-    position:relative;
-    overflow:hidden;
-  }
-  .dc-poster{width:100%;height:100%;object-fit:cover;display:block;}
-  .dc-body{padding:14px 16px 16px; display:flex; flex-direction:column; gap:9px;}
-  .dc-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
-  .dc-title{font-family:'Unbounded',sans-serif; font-weight:700; font-size:14.5px; line-height:1.3; color:var(--text);}
-  .dc-where{margin-top:4px; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);}
-  .dc-media-badge{
-    flex-shrink:0;
-    font-family:'Unbounded',sans-serif;
-    font-weight:800;
-    font-size:13px;
-    padding:5px 9px;
     border-radius:10px;
-    background:rgba(255,204,77,.15);
-    color:var(--gold);
-    font-variant-numeric:tabular-nums;
+    overflow:hidden;
+    background:linear-gradient(160deg, var(--violet-deep), var(--magenta-deep));
+    border:1px solid var(--line);
   }
-  .dc-ratings{display:flex; gap:6px; flex-wrap:wrap;}
-  .dc-obs{margin:0; font-size:12.5px; line-height:1.6; color:#ded7f0;}
+  .poster-upload-preview img{width:100%; height:100%; object-fit:cover; display:block;}
+  .poster-upload-actions{display:flex; flex-direction:column; gap:6px; align-items:flex-start;}
+  .poster-upload-btn{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12px;
+    font-weight:600;
+    padding:9px 15px;
+    border-radius:99px;
+    border:1px solid var(--line);
+    background:rgba(255,255,255,.04);
+    color:var(--text);
+    cursor:pointer;
+    transition:.15s;
+  }
+  .poster-upload-btn:hover{border-color:var(--magenta);}
+  .poster-upload-clear{font-size:11px; color:var(--muted); background:none; border:none; cursor:pointer; padding:0; text-decoration:underline;}
+  .poster-upload-clear:hover{color:var(--danger);}
 
   footer{text-align:center; padding:0 20px 90px; color:var(--muted); font-size:12.5px; letter-spacing:.02em;}
   footer .heart{color:var(--magenta);}
@@ -808,7 +792,7 @@
   /* reduced motion */
   @media (prefers-reduced-motion: reduce){
     .wheel-spin-wrap{transition:none;}
-    .marquee-track, .aurora span, .wheel-halo, .hub{animation:none !important;}
+    .top-flare, .aurora span, .wheel-halo, .hub, .sparkle{animation:none !important;}
     *{animation-duration:.001s !important;}
   }
 </style>
@@ -817,38 +801,29 @@
 
 <div class="aurora"><span></span><span></span><span></span></div>
 <div class="grain"></div>
+<div class="sparkles" id="sparkles"></div>
 
-<div class="marquee">
-  <div class="marquee-track">
-    <span>★ NOSSO DIÁRIO DE CINEMA</span><span>★ PAULO &amp; JULIA</span><span>★ ROLETA DO OSCAR</span><span>★ UM FILME DE CADA VEZ</span>
-    <span>★ NOSSO DIÁRIO DE CINEMA</span><span>★ PAULO &amp; JULIA</span><span>★ ROLETA DO OSCAR</span><span>★ UM FILME DE CADA VEZ</span>
-  </div>
-</div>
+<div class="top-flare"></div>
 
 <header>
-  <div class="eyebrow">Diário de duas pessoas</div>
   <h1>Paulo &amp; Julia no cinema</h1>
-  <p class="sub">Todo filme que a gente já viu junto — no cinema ou em casa — com nota dos dois e aquele resuminho que sempre fazemos depois. E quando bate a vontade, a roleta escolhe o próximo vencedor do Oscar pra gente ver.</p>
 
   <div class="tabs" id="tabSwitcher">
     <button class="tab-btn" data-tab="diario">📖 Diário</button>
     <button class="tab-btn" data-tab="roleta">🎰 Roleta do Oscar</button>
   </div>
   <div class="cloud-status" id="cloudStatus">Conectando…</div>
+  <button class="sound-toggle" id="soundToggle" aria-label="Ativar ou desativar som">🔊</button>
 </header>
 
 <main>
 
 <!-- ==================== ABA: DIÁRIO ==================== -->
 <section class="tab-panel" id="panel-diario">
-  <div class="diario-intro">
-    <p>Cada filme com a nota do Paulo, a nota da Julia e o resumo do que acharam. Dá pra reordenar por data, por nota, ou buscar pelo nome.</p>
-  </div>
-
-  <div class="stats-row stats-4">
+  <div class="stats-row stats-3">
     <div class="stat-tile">
       <div class="stat-num" id="dTotal">0</div>
-      <div class="stat-lbl">Filmes</div>
+      <div class="stat-lbl">Assistidos</div>
     </div>
     <div class="stat-tile">
       <div class="stat-num" id="dAvgPaulo">—</div>
@@ -857,10 +832,6 @@
     <div class="stat-tile">
       <div class="stat-num" id="dAvgJulia">—</div>
       <div class="stat-lbl">Média Julia</div>
-    </div>
-    <div class="stat-tile stat-fav">
-      <div class="stat-num" id="dFav">—</div>
-      <div class="stat-lbl">Favorito</div>
     </div>
   </div>
 
@@ -878,7 +849,7 @@
         <div class="toggle-chip" data-sort="worst">Piores notas</div>
       </div>
     </div>
-    <div class="diario-grid" id="diarioGrid"></div>
+    <div class="movie-grid" id="diarioGrid"></div>
     <div class="empty-state" id="diarioEmpty">Nenhum filme por aqui ainda. Bora adicionar o primeiro?</div>
   </div>
 </section>
@@ -988,6 +959,17 @@
   <div class="modal-card">
     <div class="modal-close" id="diarioModalClose">✕</div>
     <div class="modal-eyebrow" id="diarioModalEyebrow">Novo filme</div>
+
+    <div class="poster-upload">
+      <div class="poster-upload-preview" id="diarioPosterPreview"><div class="r-poster-placeholder">🎬</div></div>
+      <div class="poster-upload-actions">
+        <label class="poster-upload-btn">
+          📷 Trocar capa
+          <input type="file" accept="image/*" id="diarioPosterFile" hidden>
+        </label>
+        <button type="button" class="poster-upload-clear" id="diarioPosterClear" style="display:none;">remover capa enviada</button>
+      </div>
+    </div>
 
     <input type="text" class="search diario-title-input" id="diarioTitleInput" placeholder="Nome do filme">
 
@@ -1198,6 +1180,60 @@ function formatNum(n){
 const posterPlaceholderHTML = `<div class="r-poster-placeholder">🎬</div>`;
 
 /* =====================================================
+   Som (sintetizado via Web Audio — sem arquivos externos)
+===================================================== */
+const SOUND_KEY = 'cinema-pj-sound';
+let soundOn = localStorage.getItem(SOUND_KEY) !== 'off';
+let audioCtx = null;
+
+function ensureAudioCtx(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return null;
+  if(!audioCtx) audioCtx = new AC();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playTone(freq, duration, opts){
+  if(!soundOn) return;
+  const ctx = ensureAudioCtx();
+  if(!ctx) return;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = (opts && opts.type) || 'sine';
+  o.frequency.value = freq;
+  const vol = (opts && opts.vol) || 0.08;
+  const now = ctx.currentTime;
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(vol, now + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.start(now);
+  o.stop(now + duration + 0.03);
+}
+function playTick(){ playTone(1100, 0.045, {type:'square', vol:0.05}); }
+function playClick(){ playTone(700, 0.05, {type:'sine', vol:0.04}); }
+function playChime(){
+  if(!soundOn) return;
+  [523.25, 659.25, 783.99, 1046.5].forEach((freq, i)=>{
+    setTimeout(()=> playTone(freq, 0.35, {type:'triangle', vol:0.07}), i*90);
+  });
+}
+// Agenda "tiques" com intervalo crescente, imitando a desaceleração da roleta.
+function scheduleTicks(totalDuration){
+  let elapsed = 0;
+  let interval = 55;
+  function tick(){
+    if(elapsed >= totalDuration) return;
+    playTick();
+    interval *= 1.055;
+    elapsed += interval;
+    setTimeout(tick, interval);
+  }
+  setTimeout(tick, interval);
+}
+
+/* =====================================================
    Persistência da Roleta (localStorage)
 ===================================================== */
 const STORAGE_KEY = "oscar-roleta-dados";
@@ -1383,6 +1419,33 @@ function burstConfetti(originEl){
   }
 }
 
+function flareBurst(originEl){
+  const rect = originEl.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'flare-burst';
+  el.style.left = (rect.left + rect.width/2) + 'px';
+  el.style.top = (rect.top + rect.height/2) + 'px';
+  document.body.appendChild(el);
+  setTimeout(()=> el.remove(), 700);
+}
+
+// Partículas ambiente sutis no fundo (decorativo, não interativo)
+(function initSparkles(){
+  const container = document.getElementById('sparkles');
+  const colors = ['#ffcc4d', '#ff3fb0', '#2fe6d1', '#8b5cf6'];
+  for(let i=0;i<14;i++){
+    const s = document.createElement('div');
+    s.className = 'sparkle';
+    s.style.left = Math.random()*100 + '%';
+    s.style.top = Math.random()*100 + '%';
+    s.style.color = colors[i % colors.length];
+    s.style.background = colors[i % colors.length];
+    s.style.animationDelay = (Math.random()*4) + 's';
+    s.style.animationDuration = (3 + Math.random()*3) + 's';
+    container.appendChild(s);
+  }
+})();
+
 /* =====================================================
    Lógica de giro
 ===================================================== */
@@ -1407,6 +1470,7 @@ function spin(){
   spinBtn.disabled = true;
   resultCard.classList.remove('show');
   wheelHalo.classList.add('spinning');
+  scheduleTicks(4600);
 
   const pending = MOVIES.filter(m => !isWatched(m.id));
   const usePending = onlyPendingToggle.checked && pending.length > 0;
@@ -1431,6 +1495,9 @@ function spin(){
     wheelHalo.classList.remove('spinning');
     showResult(targetIndex);
     burstConfetti(hubEl);
+    flareBurst(hubEl);
+    playChime();
+    if(navigator.vibrate) navigator.vibrate([30,40,70]);
   };
   wheelWrap.addEventListener('transitionend', onEnd);
 }
@@ -1476,6 +1543,7 @@ window.addEventListener('scroll', ()=>{
   fabSpin.classList.toggle('visible', window.scrollY > trigger);
 }, {passive:true});
 fabSpin.addEventListener('click', ()=>{
+  playClick();
   window.scrollTo({top:0, behavior:'smooth'});
   setTimeout(()=>{ if(!spinning) spin(); }, 450);
 });
@@ -1598,6 +1666,7 @@ function closeModal(){
 
 modalSave.addEventListener('click', ()=>{
   if(modalMovieId === null) return;
+  playClick();
   const p = clampRating(ratePaulo.value);
   const j = clampRating(rateJulia.value);
   data[modalMovieId] = { watched:true, paulo:p, julia:j };
@@ -1750,29 +1819,26 @@ function renderDiario(){
   diarioGrid.innerHTML = '';
 
   sorted.forEach(e=>{
-    const media = computeMedia(e);
     const card = document.createElement('div');
-    card.className = 'diario-card';
+    card.className = 'movie-card';
     card.innerHTML = `
-      <div class="dc-poster-wrap"><div class="skeleton-poster"></div></div>
-      <div class="dc-body">
-        <div class="dc-top">
-          <div>
-            <div class="dc-title">${escapeHtml(e.title)}</div>
-            ${e.where ? `<div class="dc-where">${e.where === 'Cinema' ? '🎬 Cinema' : '🛋️ Casa'}</div>` : ''}
-          </div>
-          <div class="dc-media-badge">${media!==null ? formatNum(media) : '—'}</div>
-        </div>
-        <div class="dc-ratings">
-          ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
-          ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
-        </div>
-        ${e.obs ? `<p class="dc-obs">${escapeHtml(truncate(e.obs, 220))}</p>` : ''}
+      <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
+      <div class="m-info">
+        <div class="m-title">${escapeHtml(e.title)}</div>
+      </div>
+      <div class="m-ratings">
+        ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
+        ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
       </div>
     `;
     card.addEventListener('click', ()=> openDiarioModal(e));
     diarioGrid.appendChild(card);
-    lazyLoadPoster(card.querySelector('.dc-poster-wrap'), {id:e.id, t:e.title, y:''}, 'dc-poster');
+    const posterEl = card.querySelector('.m-poster');
+    if(e.poster){
+      posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
+    } else {
+      lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+    }
   });
 
   diarioEmpty.style.display = sorted.length===0 ? 'block' : 'none';
@@ -1786,14 +1852,6 @@ function updateDiarioStats(){
   const avgJ = jRatings.length ? jRatings.reduce((a,b)=>a+b,0)/jRatings.length : null;
   document.getElementById('dAvgPaulo').textContent = formatNum(avgP);
   document.getElementById('dAvgJulia').textContent = formatNum(avgJ);
-
-  let favTitle = '—';
-  let bestMedia = -1;
-  diario.forEach(e=>{
-    const m = computeMedia(e);
-    if(m!==null && m>bestMedia){ bestMedia = m; favTitle = e.title; }
-  });
-  document.getElementById('dFav').textContent = favTitle;
 }
 
 document.querySelectorAll('#diarioSortRow .toggle-chip').forEach(chip=>{
@@ -1821,9 +1879,72 @@ const diarioModalSave = document.getElementById('diarioModalSave');
 const diarioModalRemove = document.getElementById('diarioModalRemove');
 const diarioModalClose = document.getElementById('diarioModalClose');
 const addMovieBtn = document.getElementById('addMovieBtn');
+const diarioPosterPreview = document.getElementById('diarioPosterPreview');
+const diarioPosterFile = document.getElementById('diarioPosterFile');
+const diarioPosterClear = document.getElementById('diarioPosterClear');
 
 let diarioEditId = null;
 let selectedWhere = null;
+let pendingPoster; // undefined = sem mudança | null = capa removida | string = nova capa (data URL)
+
+// Redimensiona e comprime a imagem escolhida antes de guardar (evita
+// estourar o limite de tamanho de documento do Firestore).
+function readAndCompressImage(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const maxDim = 640;
+        let { width, height } = img;
+        if(width > height && width > maxDim){ height = Math.round(height * maxDim/width); width = maxDim; }
+        else if(height >= width && height > maxDim){ width = Math.round(width * maxDim/height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPosterPreview(entry){
+  diarioPosterPreview.innerHTML = '<div class="skeleton-poster"></div>';
+  if(entry && entry.poster){
+    diarioPosterPreview.innerHTML = `<img src="${entry.poster}" alt="">`;
+    diarioPosterClear.style.display = 'block';
+  } else if(entry){
+    diarioPosterClear.style.display = 'none';
+    lazyLoadPoster(diarioPosterPreview, {id:entry.id, t:entry.title, y:''}, '');
+  } else {
+    diarioPosterPreview.innerHTML = posterPlaceholderHTML;
+    diarioPosterClear.style.display = 'none';
+  }
+}
+
+diarioPosterFile.addEventListener('change', async ()=>{
+  const file = diarioPosterFile.files && diarioPosterFile.files[0];
+  if(!file) return;
+  try{
+    const dataUrl = await readAndCompressImage(file);
+    pendingPoster = dataUrl;
+    diarioPosterPreview.innerHTML = `<img src="${dataUrl}" alt="">`;
+    diarioPosterClear.style.display = 'block';
+  }catch(err){
+    console.warn('Falha ao processar imagem:', err);
+  }
+  diarioPosterFile.value = '';
+});
+
+diarioPosterClear.addEventListener('click', ()=>{
+  pendingPoster = null;
+  diarioPosterPreview.innerHTML = posterPlaceholderHTML;
+  diarioPosterClear.style.display = 'none';
+});
 
 function updateWhereChips(){
   whereCinemaChip.classList.toggle('active', selectedWhere === 'Cinema');
@@ -1834,6 +1955,7 @@ whereCasaChip.addEventListener('click', ()=>{ selectedWhere = selectedWhere === 
 
 function openDiarioModal(entry){
   diarioEditId = entry ? entry.id : null;
+  pendingPoster = undefined;
   diarioModalEyebrow.textContent = entry ? 'Editar filme' : 'Novo filme';
   diarioTitleInput.value = entry ? entry.title : '';
   selectedWhere = entry ? entry.where : null;
@@ -1843,6 +1965,7 @@ function openDiarioModal(entry){
   diarioObsInput.value = entry ? (entry.obs || '') : '';
   diarioModalRemove.style.display = entry ? 'block' : 'none';
   diarioModalOverlay.classList.add('open');
+  renderPosterPreview(entry);
   setTimeout(()=> diarioTitleInput.focus(), 150);
 }
 function closeDiarioModal(){
@@ -1850,20 +1973,23 @@ function closeDiarioModal(){
   diarioEditId = null;
 }
 
-addMovieBtn.addEventListener('click', ()=> openDiarioModal(null));
+addMovieBtn.addEventListener('click', ()=>{ playClick(); openDiarioModal(null); });
 
 diarioModalSave.addEventListener('click', ()=>{
   const title = diarioTitleInput.value.trim();
   if(!title){ diarioTitleInput.focus(); return; }
+  playClick();
   const p = clampRating(diarioRatePaulo.value);
   const j = clampRating(diarioRateJulia.value);
   const obs = diarioObsInput.value.trim();
 
   let entryId = diarioEditId;
   let addedAt = Date.now();
+  let poster = pendingPoster !== undefined ? pendingPoster : null;
   if(entryId){
     const entry = diario.find(e => e.id === entryId);
     addedAt = entry ? entry.addedAt : Date.now();
+    if(pendingPoster === undefined) poster = entry ? (entry.poster || null) : null;
     if(entry && entry.title !== title){
       delete wikiCache[entry.id];
       saveWikiCache();
@@ -1873,9 +1999,10 @@ diarioModalSave.addEventListener('click', ()=>{
     entry.notaPaulo = p;
     entry.notaJulia = j;
     entry.obs = obs;
+    entry.poster = poster;
   } else {
     entryId = 'd'+Date.now();
-    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt });
+    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster });
   }
   saveDiarioLocal();
   closeDiarioModal();
@@ -1883,7 +2010,7 @@ diarioModalSave.addEventListener('click', ()=>{
   updateDiarioStats();
 
   if(cloudEnabled){
-    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt })
+    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster })
       .catch(err => console.warn('Falha ao sincronizar filme do diário:', err));
   }
 });
@@ -1929,7 +2056,17 @@ function setActiveTab(tab){
   if(tab !== 'roleta'){ fabSpin.classList.remove('visible'); }
   else { requestAnimationFrame(()=> drawWheel()); }
 }
-tabBtns.forEach(b => b.addEventListener('click', ()=> setActiveTab(b.dataset.tab)));
+tabBtns.forEach(b => b.addEventListener('click', ()=>{ playClick(); setActiveTab(b.dataset.tab); }));
+
+const soundToggle = document.getElementById('soundToggle');
+function updateSoundToggle(){ soundToggle.textContent = soundOn ? '🔊' : '🔇'; }
+updateSoundToggle();
+soundToggle.addEventListener('click', ()=>{
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
+  updateSoundToggle();
+  if(soundOn) playClick();
+});
 setActiveTab(activeTab);
 
 /* =====================================================
