@@ -212,29 +212,36 @@
   /* ---------- Tabs ---------- */
   .tabs{
     display:flex;
-    gap:8px;
-    max-width:420px;
-    margin:26px auto 0;
+    gap:6px;
+    max-width:440px;
+    margin:24px auto 0;
   }
   .tab-btn{
     flex:1;
-    font-family:'Unbounded',sans-serif;
-    font-size:11.5px;
-    font-weight:700;
-    text-transform:uppercase;
-    letter-spacing:.04em;
-    padding:13px 10px;
-    border-radius:14px;
+    min-width:0;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0;
+    padding:11px 6px;
+    border-radius:12px;
     border:1px solid var(--line);
     background:var(--panel);
     color:var(--muted);
     cursor:pointer;
     transition:.2s;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   .tab-btn.active{
     background:linear-gradient(100deg, var(--gold), var(--magenta) 70%, var(--violet));
     color:#0a0512;
     border-color:transparent;
+    font-weight:700;
+  }
+  @media (min-width:420px){
+    .tab-btn{font-size:12.5px; padding:12px 8px;}
   }
   .cloud-status{
     margin:14px auto 0;
@@ -840,6 +847,20 @@
   }
   .modal-save:hover{filter:brightness(1.08);}
   .modal-save:active{transform:scale(.98);}
+  .modal-mark-watched{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:13px;
+    color:var(--ok);
+    background:rgba(47,230,168,.12);
+    border:1px solid rgba(47,230,168,.4);
+    padding:12px;
+    border-radius:12px;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .modal-mark-watched:hover{background:rgba(47,230,168,.2);}
+  .modal-mark-watched:active{transform:scale(.98);}
   .modal-remove{
     font-family:'Space Grotesk',sans-serif;
     font-size:12.5px;
@@ -891,7 +912,8 @@
 
   <div class="tabs" id="tabSwitcher">
     <button class="tab-btn" data-tab="diario">📖 Diário</button>
-    <button class="tab-btn" data-tab="roleta">🎰 Roleta do Oscar</button>
+    <button class="tab-btn" data-tab="watchlist">🍿 Quero ver</button>
+    <button class="tab-btn" data-tab="roleta">🎰 Roleta</button>
   </div>
   <!-- <div class="cloud-status" id="cloudStatus">Conectando…</div> -->
   <button class="sound-toggle" id="soundToggle" aria-label="Ativar ou desativar som">🔊</button>
@@ -933,6 +955,28 @@
     </div>
     <div class="movie-grid" id="diarioGrid"></div>
     <div class="empty-state" id="diarioEmpty">Nenhum filme por aqui ainda. Bora adicionar o primeiro?</div>
+  </div>
+</section>
+
+<!-- ==================== ABA: QUERO VER ==================== -->
+<section class="tab-panel" id="panel-watchlist" hidden>
+  <div class="stats-row" style="grid-template-columns:1fr; max-width:280px;">
+    <div class="stat-tile">
+      <div class="stat-num" id="wTotal">0</div>
+      <div class="stat-lbl">Na lista pra ver</div>
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div class="list-head">
+      <div class="list-head-top">
+        <h2>Quero ver</h2>
+        <button class="add-btn" id="addWatchlistBtn">+ Adicionar</button>
+      </div>
+      <input type="text" class="search" id="watchlistSearch" placeholder="Buscar filme…">
+    </div>
+    <div class="movie-grid" id="watchlistGrid"></div>
+    <div class="empty-state" id="watchlistEmpty">Nada guardado ainda. Viu alguma indicação boa? Adiciona aqui pra não esquecer.</div>
   </div>
 </section>
 
@@ -1086,6 +1130,36 @@
   </div>
 </div>
 
+<!-- ==================== MODAL: adicionar/editar item da watchlist ==================== -->
+<div class="modal-overlay" id="watchlistModalOverlay">
+  <div class="modal-card">
+    <div class="modal-close" id="watchlistModalClose">✕</div>
+    <div class="modal-eyebrow" id="watchlistModalEyebrow">Novo filme pra ver</div>
+
+    <div class="poster-upload">
+      <div class="poster-upload-preview" id="watchlistPosterPreview"><div class="r-poster-placeholder">🍿</div></div>
+      <div class="poster-upload-actions">
+        <label class="poster-upload-btn">
+          📷 Trocar capa
+          <input type="file" accept="image/*" id="watchlistPosterFile" hidden>
+        </label>
+        <button type="button" class="poster-upload-clear" id="watchlistPosterClear" style="display:none;">remover capa enviada</button>
+      </div>
+    </div>
+
+    <input type="text" class="search diario-title-input" id="watchlistTitleInput" placeholder="Nome do filme">
+
+    <span class="field-label">Sobre o que é / por que quer ver</span>
+    <textarea class="diario-textarea" id="watchlistDescInput" rows="4" placeholder="Do que se trata, onde viu a indicação…"></textarea>
+
+    <div class="modal-actions">
+      <button class="modal-save" id="watchlistModalSave">Salvar na lista</button>
+      <button class="modal-mark-watched" id="watchlistMarkWatched" style="display:none;">✓ Já assisti — mover pro Diário</button>
+      <button class="modal-remove" id="watchlistModalRemove" style="display:none;">Remover da lista</button>
+    </div>
+  </div>
+</div>
+
 <button class="fab" id="fabSpin" aria-label="Girar a roleta">🎬</button>
 
 <footer>
@@ -1118,6 +1192,7 @@ const fbAuth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 const roletaDocRef = doc(db, 'sync', 'roleta');
 const diarioColRef = collection(db, 'diario');
+const watchlistColRef = collection(db, 'watchlist');
 let cloudEnabled = false;
 
 /* =====================================================
@@ -1989,7 +2064,7 @@ const diarioPosterClear = document.getElementById('diarioPosterClear');
 
 let diarioEditId = null;
 let selectedWhere = null;
-let pendingPoster; // undefined = sem mudança | null = capa removida | string = nova capa (data URL)
+let convertingWatchlistId = null; // id do item da watchlist sendo convertido pro Diário, se houver
 
 // Redimensiona e comprime a imagem escolhida antes de guardar (evita
 // estourar o limite de tamanho de documento do Firestore).
@@ -2016,39 +2091,43 @@ function readAndCompressImage(file){
   });
 }
 
-function renderPosterPreview(entry){
-  diarioPosterPreview.innerHTML = '<div class="skeleton-poster"></div>';
-  if(entry && entry.poster){
-    diarioPosterPreview.innerHTML = `<img src="${entry.poster}" alt="">`;
-    diarioPosterClear.style.display = 'block';
-  } else if(entry){
-    diarioPosterClear.style.display = 'none';
-    lazyLoadPoster(diarioPosterPreview, {id:entry.id, t:entry.title, y:''}, '');
-  } else {
-    diarioPosterPreview.innerHTML = posterPlaceholderHTML;
-    diarioPosterClear.style.display = 'none';
+// Fábrica reutilizável de "escolher/trocar capa" (usada no Diário e na watchlist)
+function setupPosterPicker(previewEl, fileInputEl, clearBtnEl){
+  const state = { pending: undefined };
+  function render(entry){
+    previewEl.innerHTML = '<div class="skeleton-poster"></div>';
+    if(entry && entry.poster){
+      previewEl.innerHTML = `<img src="${entry.poster}" alt="">`;
+      clearBtnEl.style.display = 'block';
+    } else if(entry){
+      clearBtnEl.style.display = 'none';
+      lazyLoadPoster(previewEl, {id:entry.id, t:entry.title, y:''}, '');
+    } else {
+      previewEl.innerHTML = posterPlaceholderHTML;
+      clearBtnEl.style.display = 'none';
+    }
   }
+  fileInputEl.addEventListener('change', async ()=>{
+    const file = fileInputEl.files && fileInputEl.files[0];
+    if(!file) return;
+    try{
+      const dataUrl = await readAndCompressImage(file);
+      state.pending = dataUrl;
+      previewEl.innerHTML = `<img src="${dataUrl}" alt="">`;
+      clearBtnEl.style.display = 'block';
+    }catch(err){
+      console.warn('Falha ao processar imagem:', err);
+    }
+    fileInputEl.value = '';
+  });
+  clearBtnEl.addEventListener('click', ()=>{
+    state.pending = null;
+    previewEl.innerHTML = posterPlaceholderHTML;
+    clearBtnEl.style.display = 'none';
+  });
+  return { render, state };
 }
-
-diarioPosterFile.addEventListener('change', async ()=>{
-  const file = diarioPosterFile.files && diarioPosterFile.files[0];
-  if(!file) return;
-  try{
-    const dataUrl = await readAndCompressImage(file);
-    pendingPoster = dataUrl;
-    diarioPosterPreview.innerHTML = `<img src="${dataUrl}" alt="">`;
-    diarioPosterClear.style.display = 'block';
-  }catch(err){
-    console.warn('Falha ao processar imagem:', err);
-  }
-  diarioPosterFile.value = '';
-});
-
-diarioPosterClear.addEventListener('click', ()=>{
-  pendingPoster = null;
-  diarioPosterPreview.innerHTML = posterPlaceholderHTML;
-  diarioPosterClear.style.display = 'none';
-});
+const diarioPoster = setupPosterPicker(diarioPosterPreview, diarioPosterFile, diarioPosterClear);
 
 function updateWhereChips(){
   whereCinemaChip.classList.toggle('active', selectedWhere === 'Cinema');
@@ -2057,11 +2136,10 @@ function updateWhereChips(){
 whereCinemaChip.addEventListener('click', ()=>{ selectedWhere = selectedWhere === 'Cinema' ? null : 'Cinema'; updateWhereChips(); });
 whereCasaChip.addEventListener('click', ()=>{ selectedWhere = selectedWhere === 'Casa' ? null : 'Casa'; updateWhereChips(); });
 
-function openDiarioModal(entry){
+function openDiarioModal(entry, prefill){
   diarioEditId = entry ? entry.id : null;
-  pendingPoster = undefined;
   diarioModalEyebrow.textContent = entry ? 'Editar filme' : 'Novo filme';
-  diarioTitleInput.value = entry ? entry.title : '';
+  diarioTitleInput.value = entry ? entry.title : ((prefill && prefill.title) || '');
   selectedWhere = entry ? entry.where : null;
   updateWhereChips();
   diarioRatePaulo.value = (entry && entry.notaPaulo!=null) ? entry.notaPaulo : '';
@@ -2069,12 +2147,22 @@ function openDiarioModal(entry){
   diarioObsInput.value = entry ? (entry.obs || '') : '';
   diarioModalRemove.style.display = entry ? 'block' : 'none';
   diarioModalOverlay.classList.add('open');
-  renderPosterPreview(entry);
+  if(entry){
+    diarioPoster.state.pending = undefined;
+    diarioPoster.render(entry);
+  } else if(prefill && prefill.poster){
+    diarioPoster.state.pending = prefill.poster;
+    diarioPoster.render({ poster: prefill.poster });
+  } else {
+    diarioPoster.state.pending = undefined;
+    diarioPoster.render(null);
+  }
   setTimeout(()=> diarioTitleInput.focus(), 150);
 }
 function closeDiarioModal(){
   diarioModalOverlay.classList.remove('open');
   diarioEditId = null;
+  convertingWatchlistId = null;
 }
 
 addMovieBtn.addEventListener('click', ()=>{ playClick(); openDiarioModal(null); });
@@ -2089,6 +2177,7 @@ diarioModalSave.addEventListener('click', ()=>{
 
   let entryId = diarioEditId;
   let addedAt = Date.now();
+  const pendingPoster = diarioPoster.state.pending;
   let poster = pendingPoster !== undefined ? pendingPoster : null;
   if(entryId){
     const entry = diario.find(e => e.id === entryId);
@@ -2109,6 +2198,8 @@ diarioModalSave.addEventListener('click', ()=>{
     diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster });
   }
   saveDiarioLocal();
+
+  const finishedConvertingId = convertingWatchlistId;
   closeDiarioModal();
   renderDiario();
   updateDiarioStats();
@@ -2116,6 +2207,10 @@ diarioModalSave.addEventListener('click', ()=>{
   if(cloudEnabled){
     setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster })
       .catch(err => console.warn('Falha ao sincronizar filme do diário:', err));
+  }
+
+  if(finishedConvertingId){
+    removeWatchlistEntry(finishedConvertingId);
   }
 });
 
@@ -2138,17 +2233,177 @@ diarioModalRemove.addEventListener('click', ()=>{
 diarioModalClose.addEventListener('click', closeDiarioModal);
 diarioModalOverlay.addEventListener('click', (e)=>{ if(e.target === diarioModalOverlay) closeDiarioModal(); });
 
+/* =====================================================
+   QUERO VER — filmes indicados que ainda não assistiram
+===================================================== */
+const WATCHLIST_STORAGE_KEY = 'cinema-pj-watchlist';
+
+function loadWatchlist(){
+  try{
+    const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return [];
+}
+function saveWatchlistLocal(){
+  localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist));
+}
+let watchlist = loadWatchlist();
+
+const watchlistGrid = document.getElementById('watchlistGrid');
+const watchlistEmpty = document.getElementById('watchlistEmpty');
+const watchlistSearch = document.getElementById('watchlistSearch');
+const addWatchlistBtn = document.getElementById('addWatchlistBtn');
+const watchlistModalOverlay = document.getElementById('watchlistModalOverlay');
+const watchlistModalEyebrow = document.getElementById('watchlistModalEyebrow');
+const watchlistTitleInput = document.getElementById('watchlistTitleInput');
+const watchlistDescInput = document.getElementById('watchlistDescInput');
+const watchlistModalSave = document.getElementById('watchlistModalSave');
+const watchlistModalRemove = document.getElementById('watchlistModalRemove');
+const watchlistModalClose = document.getElementById('watchlistModalClose');
+const watchlistMarkWatched = document.getElementById('watchlistMarkWatched');
+const watchlistPosterPreview = document.getElementById('watchlistPosterPreview');
+const watchlistPosterFile = document.getElementById('watchlistPosterFile');
+const watchlistPosterClear = document.getElementById('watchlistPosterClear');
+const watchlistPoster = setupPosterPicker(watchlistPosterPreview, watchlistPosterFile, watchlistPosterClear);
+
+let watchlistEditId = null;
+
+function renderWatchlist(){
+  const q = watchlistSearch.value.trim().toLowerCase();
+  const filtered = watchlist
+    .filter(e => !q || e.title.toLowerCase().includes(q))
+    .sort((a,b) => b.addedAt - a.addedAt);
+  watchlistGrid.innerHTML = '';
+
+  filtered.forEach(e=>{
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    card.innerHTML = `
+      <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
+      <div class="m-info">
+        <div class="m-title">${escapeHtml(e.title)}</div>
+      </div>
+    `;
+    card.addEventListener('click', ()=> openWatchlistModal(e));
+    watchlistGrid.appendChild(card);
+    const posterEl = card.querySelector('.m-poster');
+    if(e.poster){
+      posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
+    } else {
+      lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+    }
+  });
+
+  watchlistEmpty.style.display = filtered.length===0 ? 'block' : 'none';
+}
+function updateWatchlistStats(){
+  document.getElementById('wTotal').textContent = watchlist.length;
+}
+
+function openWatchlistModal(entry){
+  watchlistEditId = entry ? entry.id : null;
+  watchlistModalEyebrow.textContent = entry ? 'Editar item' : 'Novo filme pra ver';
+  watchlistTitleInput.value = entry ? entry.title : '';
+  watchlistDescInput.value = entry ? (entry.description || '') : '';
+  watchlistModalRemove.style.display = entry ? 'block' : 'none';
+  watchlistMarkWatched.style.display = entry ? 'block' : 'none';
+  watchlistModalOverlay.classList.add('open');
+  watchlistPoster.state.pending = undefined;
+  watchlistPoster.render(entry);
+  setTimeout(()=> watchlistTitleInput.focus(), 150);
+}
+function closeWatchlistModal(){
+  watchlistModalOverlay.classList.remove('open');
+  watchlistEditId = null;
+}
+
+addWatchlistBtn.addEventListener('click', ()=>{ playClick(); openWatchlistModal(null); });
+
+watchlistModalSave.addEventListener('click', ()=>{
+  const title = watchlistTitleInput.value.trim();
+  if(!title){ watchlistTitleInput.focus(); return; }
+  playClick();
+  const description = watchlistDescInput.value.trim();
+
+  let entryId = watchlistEditId;
+  let addedAt = Date.now();
+  const pendingPoster = watchlistPoster.state.pending;
+  let poster = pendingPoster !== undefined ? pendingPoster : null;
+  if(entryId){
+    const entry = watchlist.find(e => e.id === entryId);
+    addedAt = entry ? entry.addedAt : Date.now();
+    if(pendingPoster === undefined) poster = entry ? (entry.poster || null) : null;
+    if(entry && entry.title !== title){
+      delete wikiCache[entry.id];
+      saveWikiCache();
+    }
+    entry.title = title;
+    entry.description = description;
+    entry.poster = poster;
+  } else {
+    entryId = 'w'+Date.now();
+    watchlist.push({ id:entryId, title, description, addedAt, poster });
+  }
+  saveWatchlistLocal();
+  closeWatchlistModal();
+  renderWatchlist();
+  updateWatchlistStats();
+
+  if(cloudEnabled){
+    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster })
+      .catch(err => console.warn('Falha ao sincronizar item da watchlist:', err));
+  }
+});
+
+function removeWatchlistEntry(id){
+  watchlist = watchlist.filter(e => e.id !== id);
+  delete wikiCache[id];
+  saveWikiCache();
+  saveWatchlistLocal();
+  renderWatchlist();
+  updateWatchlistStats();
+  if(cloudEnabled){
+    deleteDoc(doc(watchlistColRef, id)).catch(err => console.warn('Falha ao remover item no servidor:', err));
+  }
+}
+
+watchlistModalRemove.addEventListener('click', ()=>{
+  if(!watchlistEditId) return;
+  removeWatchlistEntry(watchlistEditId);
+  closeWatchlistModal();
+});
+
+watchlistMarkWatched.addEventListener('click', ()=>{
+  if(!watchlistEditId) return;
+  const entry = watchlist.find(e => e.id === watchlistEditId);
+  if(!entry) return;
+  playClick();
+  convertingWatchlistId = entry.id;
+  closeWatchlistModal();
+  openDiarioModal(null, { title: entry.title, poster: entry.poster });
+});
+
+watchlistModalClose.addEventListener('click', closeWatchlistModal);
+watchlistModalOverlay.addEventListener('click', (e)=>{ if(e.target === watchlistModalOverlay) closeWatchlistModal(); });
+watchlistSearch.addEventListener('input', renderWatchlist);
+
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Escape') return;
   if(modalOverlay.classList.contains('open')) closeModal();
   if(diarioModalOverlay.classList.contains('open')) closeDiarioModal();
+  if(watchlistModalOverlay.classList.contains('open')) closeWatchlistModal();
 });
 
 /* =====================================================
    Troca de abas
 ===================================================== */
 const tabBtns = document.querySelectorAll('.tab-btn');
-const panels = { diario: document.getElementById('panel-diario'), roleta: document.getElementById('panel-roleta') };
+const panels = {
+  diario: document.getElementById('panel-diario'),
+  watchlist: document.getElementById('panel-watchlist'),
+  roleta: document.getElementById('panel-roleta')
+};
 const ACTIVE_TAB_KEY = 'oscar-roleta-active-tab';
 let activeTab = localStorage.getItem(ACTIVE_TAB_KEY) || 'diario';
 
@@ -2231,6 +2486,23 @@ async function initCloudSync(){
       updateDiarioStats();
     });
 
+    // --- Quero ver: semeia a coleção com os itens locais se ela estiver vazia ---
+    const watchlistSnap = await getDocs(watchlistColRef);
+    if(watchlistSnap.empty && watchlist.length){
+      const batch = writeBatch(db);
+      watchlist.forEach(e=>{
+        const { id, ...rest } = e;
+        batch.set(doc(watchlistColRef, id), rest);
+      });
+      await batch.commit();
+    }
+    onSnapshot(watchlistColRef, (snap)=>{
+      watchlist = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      try{ localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist)); }catch(e){}
+      renderWatchlist();
+      updateWatchlistStats();
+    });
+
     cloudEnabled = true;
     setCloudStatus('☁️ Sincronizado entre aparelhos', 'cloud-on');
   }catch(err){
@@ -2247,6 +2519,8 @@ renderGrid();
 updateProgress();
 renderDiario();
 updateDiarioStats();
+renderWatchlist();
+updateWatchlistStats();
 initCloudSync();
 </script>
 </body>
