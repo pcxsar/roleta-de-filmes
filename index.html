@@ -520,6 +520,7 @@
     font-size:12px;
     text-transform:uppercase;
   }
+  #wrGenreTag{display:flex; gap:6px; justify-content:center; flex-wrap:wrap; text-transform:none; letter-spacing:normal;}
   .result .r-title{
     font-family:'Unbounded',sans-serif;
     font-weight:700;
@@ -682,6 +683,9 @@
     transition:border-color .15s, background .15s, transform .15s;
   }
   .movie-card:hover{transform:translateY(-2px); background:var(--panel-2);}
+  .movie-card.mc-stacked{flex-direction:column; align-items:stretch; gap:8px;}
+  .mc-main{display:flex; align-items:center; gap:12px;}
+  .mc-genres{display:flex; flex-wrap:wrap; gap:5px; padding-left:50px;}
   .movie-card.done{background:linear-gradient(180deg, rgba(47,230,168,.08), var(--panel));}
   .m-poster{
     width:38px; min-width:38px;
@@ -1342,35 +1346,6 @@
 
 </main>
 
-<!-- ==================== MODAL: avaliar filme da roleta ==================== -->
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal-card">
-    <div class="modal-close" id="modalClose">✕</div>
-    <div class="modal-eyebrow" id="modalYear">Oscar —</div>
-    <div class="modal-title" id="modalTitle">Nome do filme</div>
-
-    <div class="rate-row">
-      <label><span class="rate-dot p"></span>Nota do Paulo</label>
-      <div class="rate-input-wrap">
-        <input type="number" class="rate-input" id="ratePaulo" min="0" max="10" step="0.5" placeholder="—">
-        <span class="rate-sub">/ 10</span>
-      </div>
-    </div>
-    <div class="rate-row">
-      <label><span class="rate-dot j"></span>Nota da Julia</label>
-      <div class="rate-input-wrap">
-        <input type="number" class="rate-input" id="rateJulia" min="0" max="10" step="0.5" placeholder="—">
-        <span class="rate-sub">/ 10</span>
-      </div>
-    </div>
-
-    <div class="modal-actions">
-      <button class="modal-save" id="modalSave">Salvar avaliação</button>
-      <button class="modal-remove" id="modalRemove">Remover da lista de assistidos</button>
-    </div>
-  </div>
-</div>
-
 <!-- ==================== MODAL: adicionar/editar filme do Diário ==================== -->
 <div class="modal-overlay" id="diarioModalOverlay">
   <div class="modal-card">
@@ -1651,6 +1626,19 @@ const MOVIE_GENRES = [
   {id:'musical', emoji:'🎵', label:'Musical', color:'#ffcc4d'},
 ];
 function genreById(id){ return MOVIE_GENRES.find(g => g.id === id) || null; }
+// Lê os gêneros de um filme já normalizados em array — compatível com
+// registros antigos que ainda tinham só "genre" (uma categoria só).
+function entryGenres(e){
+  if(!e) return [];
+  if(Array.isArray(e.genres)) return e.genres.filter(Boolean);
+  if(e.genre) return [e.genre];
+  return [];
+}
+function genreChipsHtml(genreIds){
+  return genreIds.map(genreById).filter(Boolean).map(g =>
+    `<span class="m-genre-chip" style="background:${g.color}26; color:${g.color};">${g.emoji} ${escapeHtml(g.label)}</span>`
+  ).join('');
+}
 
 // Fábrica de dropdown de categoria (usado como seletor em modais e como
 // filtro em listas — funciona igual em qualquer dispositivo, sem
@@ -1717,6 +1705,82 @@ function createGenreDropdown(mountEl, opts){
   setValue(null);
   return { setValue, getValue: ()=>value, close: ()=> root.classList.remove('open') };
 }
+
+// Variante multi-seleção do dropdown de categoria — usada nos modais de
+// adicionar/editar filme, pra poder marcar mais de um gênero (ex: Comédia
+// + Romance). O menu fica aberto entre um clique e outro pra dar pra
+// marcar vários de uma vez; fecha só ao clicar fora ou no botão.
+function createGenreMultiPicker(mountEl, opts){
+  const { emptyLabel } = opts;
+  mountEl.innerHTML = `
+    <div class="genre-dropdown">
+      <button type="button" class="genre-dropdown-btn">
+        <span class="gd-label">${escapeHtml(emptyLabel)}</span>
+        <span class="gd-arrow">▾</span>
+      </button>
+      <div class="genre-dropdown-menu"></div>
+    </div>`;
+  const root = mountEl.querySelector('.genre-dropdown');
+  const btn = root.querySelector('.genre-dropdown-btn');
+  const labelEl = root.querySelector('.gd-label');
+  const menu = root.querySelector('.genre-dropdown-menu');
+  let values = [];
+
+  MOVIE_GENRES.forEach(g=>{
+    const opt = document.createElement('div');
+    opt.className = 'gd-option';
+    opt.dataset.genre = g.id;
+    opt.innerHTML = `<span class="gd-dot" style="background:${g.color}"></span>${g.emoji} ${escapeHtml(g.label)}`;
+    menu.appendChild(opt);
+  });
+
+  function refresh(){
+    const genres = values.map(genreById).filter(Boolean);
+    if(!genres.length){
+      labelEl.textContent = emptyLabel;
+      labelEl.style.color = '';
+    } else if(genres.length === 1){
+      labelEl.textContent = genres[0].emoji + ' ' + genres[0].label;
+      labelEl.style.color = genres[0].color;
+    } else {
+      labelEl.textContent = genres.map(g=>g.emoji).join(' ') + ' ' + genres.length + ' categorias';
+      labelEl.style.color = genres[0].color;
+    }
+    [...menu.children].forEach(opt=>{
+      const active = values.includes(opt.dataset.genre);
+      opt.classList.toggle('active', active);
+      const og = genreById(opt.dataset.genre);
+      if(active && og){
+        opt.style.background = og.color + '29';
+        opt.style.color = og.color;
+      } else {
+        opt.style.background = '';
+        opt.style.color = '';
+      }
+    });
+  }
+  function setValues(arr){
+    values = Array.isArray(arr) ? arr.filter(Boolean) : [];
+    refresh();
+  }
+  [...menu.children].forEach(opt=>{
+    opt.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const id = opt.dataset.genre;
+      if(values.includes(id)) values = values.filter(v => v !== id);
+      else values.push(id);
+      refresh();
+    });
+  });
+  btn.addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    document.querySelectorAll('.genre-dropdown.open').forEach(d=>{ if(d!==root) d.classList.remove('open'); });
+    root.classList.toggle('open');
+  });
+  setValues([]);
+  return { setValues, getValues: ()=>values.slice(), close: ()=> root.classList.remove('open') };
+}
+
 document.addEventListener('click', ()=>{
   document.querySelectorAll('.genre-dropdown.open').forEach(d=> d.classList.remove('open'));
 });
@@ -2098,7 +2162,7 @@ spinBtn.addEventListener('click', spin);
 
 rMark.addEventListener('click', ()=>{
   if(!currentPick) return;
-  openModal(currentPick.id);
+  openRatingForOscarMovie(currentPick.id);
 });
 
 /* =====================================================
@@ -2185,7 +2249,7 @@ function renderGrid(){
       </div>
       ${chips}
     `;
-    card.addEventListener('click', ()=> openModal(m.id));
+    card.addEventListener('click', ()=> openRatingForOscarMovie(m.id));
     grid.appendChild(card);
     lazyLoadPoster(card.querySelector('.m-poster'), m, 'm-poster-img');
   });
@@ -2202,62 +2266,27 @@ function updateProgress(){
 }
 
 /* =====================================================
-   Modal de avaliação da Roleta (nota do Paulo e da Julia)
+   Avaliar filme do Oscar — abre o mesmo modal do Diário, com
+   nota, opinião e categoria, em vez do antigo modal simplificado.
+   Se já existe um registro do Diário ligado a esse filme, edita
+   ele; senão cria um novo já com título e capa preenchidos.
 ===================================================== */
-const modalOverlay = document.getElementById('modalOverlay');
-const modalYear = document.getElementById('modalYear');
-const modalTitle = document.getElementById('modalTitle');
-const ratePaulo = document.getElementById('ratePaulo');
-const rateJulia = document.getElementById('rateJulia');
-const modalSave = document.getElementById('modalSave');
-const modalRemove = document.getElementById('modalRemove');
-const modalClose = document.getElementById('modalClose');
-
-let modalMovieId = null;
-
-function openModal(id){
-  const m = ALL_OSCAR_WINNERS[id];
-  modalMovieId = id;
-  modalYear.textContent = 'Oscar ' + m.y;
-  modalTitle.textContent = m.t;
-  const p = getRating(id,'paulo');
-  const j = getRating(id,'julia');
-  ratePaulo.value = (p===null || p===undefined) ? '' : p;
-  rateJulia.value = (j===null || j===undefined) ? '' : j;
-  modalRemove.style.display = isWatched(id) ? 'block' : 'none';
-  modalOverlay.classList.add('open');
-  setTimeout(()=> ratePaulo.focus(), 150);
+function openRatingForOscarMovie(movieId){
+  const movie = ALL_OSCAR_WINNERS[movieId];
+  const existingEntry = diario.find(e => e.oscarId === movieId);
+  if(existingEntry){
+    openDiarioModal(existingEntry);
+  } else {
+    const existingRating = data[movieId] || {};
+    openDiarioModal(null, {
+      title: movie.t,
+      oscarId: movieId,
+      y: movie.y,
+      notaPaulo: existingRating.paulo,
+      notaJulia: existingRating.julia
+    });
+  }
 }
-function closeModal(){
-  modalOverlay.classList.remove('open');
-  modalMovieId = null;
-}
-
-modalSave.addEventListener('click', ()=>{
-  if(modalMovieId === null) return;
-  playClick();
-  const p = clampRating(ratePaulo.value);
-  const j = clampRating(rateJulia.value);
-  data[modalMovieId] = { watched:true, paulo:p, julia:j };
-  saveData(modalMovieId);
-  closeModal();
-  renderGrid();
-  updateProgress();
-  if(currentPick && currentPick.id === modalMovieId) showResult(MOVIES.findIndex(m=>m.id===modalMovieId), {withMedia:false});
-});
-
-modalRemove.addEventListener('click', ()=>{
-  if(modalMovieId === null) return;
-  delete data[modalMovieId];
-  saveData(modalMovieId);
-  closeModal();
-  renderGrid();
-  updateProgress();
-  if(currentPick && currentPick.id === modalMovieId) showResult(MOVIES.findIndex(m=>m.id===modalMovieId), {withMedia:false});
-});
-
-modalClose.addEventListener('click', closeModal);
-modalOverlay.addEventListener('click', (e)=>{ if(e.target === modalOverlay) closeModal(); });
 
 const skeletonHTML = `
   <div class="r-poster-wrap"><div class="skeleton-poster"></div></div>
@@ -2386,20 +2415,20 @@ function renderDiario(){
   const genreFilter = diarioGenreFilter.getValue();
   const filtered = diario
     .filter(e => !q || e.title.toLowerCase().includes(q))
-    .filter(e => !genreFilter || e.genre === genreFilter);
+    .filter(e => !genreFilter || entryGenres(e).includes(genreFilter));
   const sorted = sortDiario(filtered, activeDiarioSort);
   diarioGrid.innerHTML = '';
 
   sorted.forEach(e=>{
-    const g = genreById(e.genre);
+    const genresHtml = genreChipsHtml(entryGenres(e));
     const media = computeMedia(e);
     const card = document.createElement('div');
-    card.className = 'movie-card';
+    card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '');
     card.innerHTML = `
+      <div class="mc-main">
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
-        ${g ? `<div class="m-genre-chip" style="display:inline-block; margin-top:3px; background:${g.color}26; color:${g.color};">${g.emoji} ${escapeHtml(g.label)}</div>` : ''}
       </div>
       <div class="m-ratings">
         ${media!=null ? `<span class="m-media-badge">${formatNum(media)}</span>` : ''}
@@ -2408,6 +2437,8 @@ function renderDiario(){
           ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
         </div>
       </div>
+      </div>
+      ${genresHtml ? `<div class="mc-genres">${genresHtml}</div>` : ''}
     `;
     card.addEventListener('click', ()=> openDiarioModal(e));
     diarioGrid.appendChild(card);
@@ -2469,6 +2500,7 @@ const diarioPosterClear = document.getElementById('diarioPosterClear');
 let diarioEditId = null;
 let selectedWhere = null;
 let convertingWatchlistId = null; // id do item da watchlist sendo convertido pro Diário, se houver
+let currentDiarioOscarId = null; // id do filme do Oscar (0-97) sendo avaliado, se houver
 
 // Redimensiona e comprime a imagem escolhida antes de guardar (evita
 // estourar o limite de tamanho de documento do Firestore).
@@ -2505,7 +2537,7 @@ function setupPosterPicker(previewEl, fileInputEl, clearBtnEl){
       clearBtnEl.style.display = 'block';
     } else if(entry){
       clearBtnEl.style.display = 'none';
-      lazyLoadPoster(previewEl, {id:entry.id, t:entry.title, y:''}, '');
+      lazyLoadPoster(previewEl, {id:entry.id, t:entry.title, y:entry.y || ''}, '');
     } else {
       previewEl.innerHTML = posterPlaceholderHTML;
       clearBtnEl.style.display = 'none';
@@ -2540,20 +2572,20 @@ function updateWhereChips(){
 whereCinemaChip.addEventListener('click', ()=>{ selectedWhere = selectedWhere === 'Cinema' ? null : 'Cinema'; updateWhereChips(); });
 whereCasaChip.addEventListener('click', ()=>{ selectedWhere = selectedWhere === 'Casa' ? null : 'Casa'; updateWhereChips(); });
 
-const diarioGenrePicker = createGenreDropdown(document.getElementById('diarioGenreRow'), {
-  allLabel: 'Sem categoria',
-  onSelect: ()=>{}
+const diarioGenrePicker = createGenreMultiPicker(document.getElementById('diarioGenreRow'), {
+  emptyLabel: 'Sem categoria'
 });
 
 function openDiarioModal(entry, prefill){
   diarioEditId = entry ? entry.id : null;
+  currentDiarioOscarId = entry ? (entry.oscarId ?? null) : ((prefill && prefill.oscarId != null) ? prefill.oscarId : null);
   diarioModalEyebrow.textContent = entry ? 'Editar filme' : 'Novo filme';
   diarioTitleInput.value = entry ? entry.title : ((prefill && prefill.title) || '');
   selectedWhere = entry ? entry.where : null;
   updateWhereChips();
-  diarioGenrePicker.setValue(entry ? (entry.genre || null) : ((prefill && prefill.genre) || null));
-  diarioRatePaulo.value = (entry && entry.notaPaulo!=null) ? entry.notaPaulo : '';
-  diarioRateJulia.value = (entry && entry.notaJulia!=null) ? entry.notaJulia : '';
+  diarioGenrePicker.setValues(entry ? entryGenres(entry) : ((prefill && prefill.genres) || []));
+  diarioRatePaulo.value = (entry && entry.notaPaulo!=null) ? entry.notaPaulo : ((prefill && prefill.notaPaulo!=null) ? prefill.notaPaulo : '');
+  diarioRateJulia.value = (entry && entry.notaJulia!=null) ? entry.notaJulia : ((prefill && prefill.notaJulia!=null) ? prefill.notaJulia : '');
   diarioObsInput.value = entry ? (entry.obs || '') : '';
   diarioModalRemove.style.display = entry ? 'block' : 'none';
   diarioModalOverlay.classList.add('open');
@@ -2563,6 +2595,11 @@ function openDiarioModal(entry, prefill){
   } else if(prefill && prefill.poster){
     diarioPoster.state.pending = prefill.poster;
     diarioPoster.render({ poster: prefill.poster });
+  } else if(prefill && prefill.oscarId != null){
+    // Sem capa própria ainda: tenta reaproveitar a capa já buscada pela
+    // roleta pra esse mesmo filme (mesmo id no cache da Wikipédia).
+    diarioPoster.state.pending = undefined;
+    diarioPoster.render({ id: prefill.oscarId, title: prefill.title, y: prefill.y || '' });
   } else {
     diarioPoster.state.pending = undefined;
     diarioPoster.render(null);
@@ -2573,6 +2610,7 @@ function closeDiarioModal(){
   diarioModalOverlay.classList.remove('open');
   diarioEditId = null;
   convertingWatchlistId = null;
+  currentDiarioOscarId = null;
 }
 
 addMovieBtn.addEventListener('click', ()=>{ playClick(); openDiarioModal(null); });
@@ -2584,7 +2622,7 @@ diarioModalSave.addEventListener('click', ()=>{
   const p = clampRating(diarioRatePaulo.value);
   const j = clampRating(diarioRateJulia.value);
   const obs = diarioObsInput.value.trim();
-  const genre = diarioGenrePicker.getValue();
+  const genres = diarioGenrePicker.getValues();
 
   let entryId = diarioEditId;
   let addedAt = Date.now();
@@ -2604,31 +2642,47 @@ diarioModalSave.addEventListener('click', ()=>{
     entry.notaJulia = j;
     entry.obs = obs;
     entry.poster = poster;
-    entry.genre = genre;
+    entry.genres = genres;
+    entry.oscarId = currentDiarioOscarId;
   } else {
     entryId = 'd'+Date.now();
-    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genre });
+    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genres, oscarId:currentDiarioOscarId });
   }
   saveDiarioLocal();
 
   const finishedConvertingId = convertingWatchlistId;
+  const linkedOscarId = currentDiarioOscarId;
   closeDiarioModal();
   renderDiario();
   updateDiarioStats();
 
   if(cloudEnabled){
-    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genre })
+    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genres, oscarId:linkedOscarId })
       .catch(err => logCloudError('Falha ao sincronizar filme do diário', err));
   }
 
   if(finishedConvertingId){
     removeWatchlistEntry(finishedConvertingId);
   }
+
+  // Filme do Oscar avaliado por aqui: mantém a Roleta em sincronia
+  // (progresso, lista de assistidos, "só pendentes").
+  if(linkedOscarId != null){
+    data[linkedOscarId] = { watched:true, paulo:p, julia:j };
+    saveData(linkedOscarId);
+    renderGrid();
+    updateProgress();
+    if(currentPick && currentPick.id === linkedOscarId){
+      showResult(MOVIES.findIndex(m => m.id === linkedOscarId), {withMedia:false});
+    }
+  }
 });
 
 diarioModalRemove.addEventListener('click', ()=>{
   if(!diarioEditId) return;
   const removedId = diarioEditId;
+  const removedEntry = diario.find(e => e.id === removedId);
+  const removedOscarId = removedEntry ? (removedEntry.oscarId ?? null) : null;
   diario = diario.filter(e => e.id !== removedId);
   delete wikiCache[removedId];
   saveWikiCache();
@@ -2639,6 +2693,16 @@ diarioModalRemove.addEventListener('click', ()=>{
 
   if(cloudEnabled){
     deleteDoc(doc(diarioColRef, removedId)).catch(err => logCloudError('Falha ao remover filme no servidor', err));
+  }
+
+  if(removedOscarId != null){
+    delete data[removedOscarId];
+    saveData(removedOscarId);
+    renderGrid();
+    updateProgress();
+    if(currentPick && currentPick.id === removedOscarId){
+      showResult(MOVIES.findIndex(m => m.id === removedOscarId), {withMedia:false});
+    }
   }
 });
 
@@ -2683,10 +2747,9 @@ const watchlistGenreFilterRow = document.getElementById('watchlistGenreFilterRow
 
 let watchlistEditId = null;
 
-// Dropdown de categoria dentro do modal (seleção única, opcional)
-const watchlistGenrePicker = createGenreDropdown(watchlistGenreRow, {
-  allLabel: 'Sem categoria',
-  onSelect: ()=>{}
+// Seletor de categoria dentro do modal (múltipla escolha, opcional)
+const watchlistGenrePicker = createGenreMultiPicker(watchlistGenreRow, {
+  emptyLabel: 'Sem categoria'
 });
 
 // Dropdown de filtro por categoria na lista ("mood do dia")
@@ -2699,20 +2762,22 @@ function renderWatchlist(){
   const q = watchlistSearch.value.trim().toLowerCase();
   const filtered = watchlist
     .filter(e => !q || e.title.toLowerCase().includes(q))
-    .filter(e => { const g = watchlistGenreFilter.getValue(); return !g || e.genre === g; })
+    .filter(e => { const g = watchlistGenreFilter.getValue(); return !g || entryGenres(e).includes(g); })
     .sort((a,b) => b.addedAt - a.addedAt);
   watchlistGrid.innerHTML = '';
 
   filtered.forEach(e=>{
-    const g = genreById(e.genre);
+    const genresHtml = genreChipsHtml(entryGenres(e));
     const card = document.createElement('div');
-    card.className = 'movie-card';
+    card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '');
     card.innerHTML = `
+      <div class="mc-main">
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
       </div>
-      ${g ? `<div class="m-ratings"><span class="m-genre-chip" style="background:${g.color}26; color:${g.color};">${g.emoji} ${escapeHtml(g.label)}</span></div>` : ''}
+      </div>
+      ${genresHtml ? `<div class="mc-genres">${genresHtml}</div>` : ''}
     `;
     card.addEventListener('click', ()=> openWatchlistModal(e));
     watchlistGrid.appendChild(card);
@@ -2736,7 +2801,7 @@ function openWatchlistModal(entry){
   watchlistModalEyebrow.textContent = entry ? 'Editar item' : 'Novo filme pra ver';
   watchlistTitleInput.value = entry ? entry.title : '';
   watchlistDescInput.value = entry ? (entry.description || '') : '';
-  watchlistGenrePicker.setValue(entry ? (entry.genre || null) : null);
+  watchlistGenrePicker.setValues(entry ? entryGenres(entry) : []);
   watchlistModalRemove.style.display = entry ? 'block' : 'none';
   watchlistMarkWatched.style.display = entry ? 'block' : 'none';
   watchlistModalOverlay.classList.add('open');
@@ -2756,7 +2821,7 @@ watchlistModalSave.addEventListener('click', ()=>{
   if(!title){ watchlistTitleInput.focus(); return; }
   playClick();
   const description = watchlistDescInput.value.trim();
-  const genre = watchlistGenrePicker.getValue();
+  const genres = watchlistGenrePicker.getValues();
 
   let entryId = watchlistEditId;
   let addedAt = Date.now();
@@ -2773,10 +2838,10 @@ watchlistModalSave.addEventListener('click', ()=>{
     entry.title = title;
     entry.description = description;
     entry.poster = poster;
-    entry.genre = genre;
+    entry.genres = genres;
   } else {
     entryId = 'w'+Date.now();
-    watchlist.push({ id:entryId, title, description, addedAt, poster, genre });
+    watchlist.push({ id:entryId, title, description, addedAt, poster, genres });
   }
   saveWatchlistLocal();
   closeWatchlistModal();
@@ -2784,7 +2849,7 @@ watchlistModalSave.addEventListener('click', ()=>{
   updateWatchlistStats();
 
   if(cloudEnabled){
-    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genre })
+    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genres })
       .catch(err => logCloudError('Falha ao sincronizar item da watchlist', err));
   }
 });
@@ -2814,7 +2879,7 @@ watchlistMarkWatched.addEventListener('click', ()=>{
   playClick();
   convertingWatchlistId = entry.id;
   closeWatchlistModal();
-  openDiarioModal(null, { title: entry.title, poster: entry.poster, genre: entry.genre });
+  openDiarioModal(null, { title: entry.title, poster: entry.poster, genres: entryGenres(entry) });
 });
 
 watchlistModalClose.addEventListener('click', closeWatchlistModal);
@@ -2823,7 +2888,6 @@ watchlistSearch.addEventListener('input', renderWatchlist);
 
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Escape') return;
-  if(modalOverlay.classList.contains('open')) closeModal();
   if(diarioModalOverlay.classList.contains('open')) closeDiarioModal();
   if(watchlistModalOverlay.classList.contains('open')) closeWatchlistModal();
 });
@@ -2903,7 +2967,7 @@ MOVIE_GENRES.forEach(g=>{
 
 function getWatchlistPool(){
   if(wrSelectedGenres.size === 0) return watchlist.slice();
-  return watchlist.filter(e => e.genre && wrSelectedGenres.has(e.genre));
+  return watchlist.filter(e => entryGenres(e).some(g => wrSelectedGenres.has(g)));
 }
 
 function renderWatchlistRoulette(){
@@ -2941,7 +3005,8 @@ function drawWatchlistWheel(){
     const start = -Math.PI/2 + i*angle;
     const end = start + angle;
     const item = wrPool[i];
-    const g = item ? genreById(item.genre) : null;
+    const itemGenres = item ? entryGenres(item) : [];
+    const g = itemGenres.length ? genreById(itemGenres[0]) : null;
     wrWheelCtx.beginPath();
     wrWheelCtx.moveTo(r,r);
     wrWheelCtx.arc(r,r,r,start,end);
@@ -2998,9 +3063,8 @@ function spinWatchlistWheel(){
 
 function showWatchlistResult(item){
   wrCurrentPick = item;
-  const g = genreById(item.genre);
-  wrGenreTag.textContent = g ? (g.emoji + ' ' + g.label) : 'Sem categoria';
-  wrGenreTag.style.color = g ? g.color : '';
+  const genresHtml = genreChipsHtml(entryGenres(item));
+  wrGenreTag.innerHTML = genresHtml || '<span class="m-genre-chip" style="background:rgba(255,255,255,.08); color:var(--muted);">Sem categoria</span>';
   wrTitle.textContent = item.title;
   wrActions.style.display = 'flex';
 
@@ -3021,7 +3085,7 @@ wrMarkWatched.addEventListener('click', ()=>{
   if(!wrCurrentPick) return;
   playClick();
   convertingWatchlistId = wrCurrentPick.id;
-  openDiarioModal(null, { title: wrCurrentPick.title, poster: wrCurrentPick.poster, genre: wrCurrentPick.genre });
+  openDiarioModal(null, { title: wrCurrentPick.title, poster: wrCurrentPick.poster, genres: entryGenres(wrCurrentPick) });
 });
 
 /* =====================================================
@@ -3038,7 +3102,7 @@ function computeProfileStats(){
   const avgCasal = allRatings.length ? allRatings.reduce((a,b)=>a+b,0)/allRatings.length : null;
 
   const genreCounts = {};
-  diario.forEach(e=>{ if(e.genre) genreCounts[e.genre] = (genreCounts[e.genre]||0) + 1; });
+  diario.forEach(e=>{ entryGenres(e).forEach(gid=>{ genreCounts[gid] = (genreCounts[gid]||0) + 1; }); });
   const genreRanking = Object.entries(genreCounts)
     .map(([id,count]) => ({ genre:genreById(id), count }))
     .filter(g => g.genre)
