@@ -1760,6 +1760,20 @@ wrMarkWatched.addEventListener('click', ()=>{
 /* =====================================================
    NÓS — perfil do casal (estatísticas derivadas do Diário)
 ===================================================== */
+let profileTopWho = 'geral'; // 'geral' | 'paulo' | 'julia'
+
+function computeTop5(who){
+  let list;
+  if(who === 'paulo'){
+    list = diario.filter(e => e.notaPaulo != null).map(e => ({ e, media: e.notaPaulo }));
+  } else if(who === 'julia'){
+    list = diario.filter(e => e.notaJulia != null).map(e => ({ e, media: e.notaJulia }));
+  } else {
+    list = diario.map(e => ({ e, media: computeMedia(e) })).filter(x => x.media != null);
+  }
+  return list.sort((a,b) => b.media - a.media).slice(0,5);
+}
+
 function computeProfileStats(){
   const total = diario.length;
 
@@ -1787,11 +1801,7 @@ function computeProfileStats(){
     else critico = avgP < avgJ ? 'Paulo' : 'Julia';
   }
 
-  const top5 = diario
-    .map(e => ({ e, media: computeMedia(e) }))
-    .filter(x => x.media != null)
-    .sort((a,b) => b.media - a.media)
-    .slice(0,5);
+  const top5 = computeTop5(profileTopWho);
 
   const clashes = diario
     .filter(e => e.notaPaulo!=null && e.notaJulia!=null)
@@ -1906,6 +1916,16 @@ function renderProfile(){
     });
   }
 }
+
+const profileTopFilter = document.getElementById('profileTopFilter');
+profileTopFilter.addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('.mode-btn');
+  if(!btn) return;
+  playClick();
+  profileTopWho = btn.dataset.who;
+  [...profileTopFilter.children].forEach(b => b.classList.toggle('active', b === btn));
+  renderProfile();
+});
 
 /* =====================================================
    Troca de abas
