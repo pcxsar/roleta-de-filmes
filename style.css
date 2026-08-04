@@ -305,6 +305,10 @@
     -webkit-text-fill-color:transparent;
     animation:title-gradient 7s linear infinite;
   }
+  .hero-title-sub{
+    display:inline-block;
+    font-size:.6em;
+  }
   @keyframes title-gradient{
     0%{background-position:0% 50%;}
     100%{background-position:300% 50%;}
