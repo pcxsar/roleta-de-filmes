@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -54,8 +54,6 @@
     <button class="tab-btn" data-tab="perfil">💑 Nós</button>
   </div>
   <!-- <div class="cloud-status" id="cloudStatus">Conectando…</div> -->
-  <button class="sound-toggle" id="soundToggle" aria-label="Ativar ou desativar som">🔊</button>
-  <div class="scroll-hint">⌄</div>
 </header>
 
 <main>
@@ -64,15 +62,15 @@
 <section class="tab-panel" id="panel-diario">
   <div class="stats-row stats-3">
     <div class="stat-tile">
-      <div class="stat-num" id="dTotal">0</div>
+      <div class="stat-num accent-cyan" id="dTotal">0</div>
       <div class="stat-lbl">Assistidos</div>
     </div>
     <div class="stat-tile">
-      <div class="stat-num" id="dAvgPaulo">—</div>
+      <div class="stat-num accent-gold" id="dAvgPaulo">—</div>
       <div class="stat-lbl">Média Paulo</div>
     </div>
     <div class="stat-tile">
-      <div class="stat-num" id="dAvgJulia">—</div>
+      <div class="stat-num accent-magenta" id="dAvgJulia">—</div>
       <div class="stat-lbl">Média Julia</div>
     </div>
   </div>
@@ -140,7 +138,7 @@
       <div class="stat-lbl">Vencedores</div>
     </div>
     <div class="stat-tile">
-      <div class="stat-num"><em id="prog-count">0</em></div>
+      <div class="stat-num"><em class="accent-cyan" id="prog-count">0</em></div>
       <div class="stat-lbl">Assistidos</div>
     </div>
   </div>
@@ -251,11 +249,11 @@
 
   <div class="stats-row stats-4">
     <div class="stat-tile">
-      <div class="stat-num" id="pTotal">0</div>
+      <div class="stat-num accent-cyan" id="pTotal">0</div>
       <div class="stat-lbl">Filmes juntos</div>
     </div>
     <div class="stat-tile">
-      <div class="stat-num" id="pAvg">—</div>
+      <div class="stat-num accent-violet" id="pAvg">—</div>
       <div class="stat-lbl">Média do casal</div>
     </div>
     <div class="stat-tile">
@@ -378,6 +376,6 @@
   Feito para Paulo &amp; Julia <span class="heart">♥</span> — filme por filme, sessão por sessão.
 </footer>
 
-<script type="module" src="app.js?v=1"></script>
+<script type="module" src="app.js?v=2"></script>
 </body>
 </html>

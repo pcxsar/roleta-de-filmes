@@ -422,6 +422,8 @@
     gap:10px;
     max-width:420px;
     margin:26px auto 0;
+    padding:0 18px;
+    box-sizing:border-box;
   }
   .stats-row.stats-3{grid-template-columns:repeat(3,1fr); max-width:460px;}
   .stat-tile{
@@ -442,7 +444,11 @@
     text-overflow:ellipsis;
     white-space:nowrap;
   }
-  .stat-tile .stat-num em{font-style:normal; color:var(--magenta);}
+  .stat-tile .stat-num em{font-style:normal;}
+  .accent-cyan{color:var(--cyan); text-shadow:0 0 16px rgba(47,230,209,.35);}
+  .accent-gold{color:var(--gold); text-shadow:0 0 16px rgba(255,204,77,.35);}
+  .accent-magenta{color:var(--magenta); text-shadow:0 0 16px rgba(255,63,176,.35);}
+  .accent-violet{color:var(--violet); text-shadow:0 0 16px rgba(139,92,246,.35);}
   .stat-tile .stat-lbl{
     margin-top:3px;
     font-size:10px;
@@ -810,6 +816,11 @@
     transition:border-color .15s, background .15s, transform .15s;
   }
   .movie-card:hover{transform:translateY(-2px); background:var(--panel-2);}
+  .movie-card.perfect-score{
+    border-color:var(--gold) !important;
+    background:linear-gradient(135deg, rgba(255,204,77,.14), var(--panel) 65%);
+    box-shadow:0 0 22px -6px rgba(255,204,77,.5);
+  }
   .movie-card.mc-stacked{flex-direction:column; align-items:stretch; gap:8px;}
   .mc-main{display:flex; align-items:center; gap:12px;}
   .mc-genres{display:flex; flex-wrap:wrap; gap:5px; padding-left:50px;}
@@ -835,6 +846,10 @@
     transition:transform .15s ease, border-color .15s ease;
   }
   .mural-card:hover{transform:translateY(-3px); border-color:var(--magenta);}
+  .mural-card.perfect-score{
+    border-color:var(--gold);
+    box-shadow:0 0 20px -4px rgba(255,204,77,.55);
+  }
   .mural-poster{position:absolute; inset:0;}
   .mural-poster img, .mural-poster .skeleton-poster{width:100%; height:100%; object-fit:cover; display:block;}
   .mural-media-badge{
@@ -847,6 +862,10 @@
     font-size:11px;
     padding:3px 7px;
     border-radius:8px;
+  }
+  .mural-media-badge.perfect{
+    background:rgba(255,204,77,.32);
+    box-shadow:0 0 10px -1px rgba(255,204,77,.6);
   }
   .mural-overlay{
     position:absolute; left:0; right:0; bottom:0; z-index:2;
@@ -898,6 +917,10 @@
     color:var(--gold);
     font-variant-numeric:tabular-nums;
     white-space:nowrap;
+  }
+  .m-media-badge.perfect{
+    background:rgba(255,204,77,.3);
+    box-shadow:0 0 12px -1px rgba(255,204,77,.6);
   }
   .m-rate-sub{display:flex; flex-direction:column; gap:3px; align-items:flex-end;}
   .m-rate-sub .m-rate-chip{font-size:9.5px; padding:2px 7px;}
@@ -995,6 +1018,11 @@
     border-radius:14px;
     margin-bottom:8px;
     animation:panel-in .4s ease both;
+  }
+  .profile-rank-row.perfect-score{
+    border-color:var(--gold);
+    background:linear-gradient(135deg, rgba(255,204,77,.14), var(--panel) 65%);
+    box-shadow:0 0 22px -6px rgba(255,204,77,.5);
   }
   .rank-num{
     width:26px; height:26px; min-width:26px;

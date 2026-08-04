@@ -1045,11 +1045,13 @@ function renderDiario(){
     const color = primaryGenreColor(e);
     const card = document.createElement('div');
 
+    const isPerfect = media === 10;
+
     if(diarioView === 'mural'){
-      card.className = 'mural-card';
+      card.className = 'mural-card' + (isPerfect ? ' perfect-score' : '');
       card.innerHTML = `
         <div class="mural-poster"><div class="skeleton-poster"></div></div>
-        ${media!=null ? `<div class="mural-media-badge">${formatNum(media)}</div>` : ''}
+        ${media!=null ? `<div class="mural-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? '⭐ ' : ''}${formatNum(media)}</div>` : ''}
         <div class="mural-overlay">${color ? `<span class="mural-dot" style="background:${color}"></span>` : ''}${escapeHtml(e.title)}</div>
       `;
       card.addEventListener('click', ()=> openDiarioModal(e));
@@ -1063,8 +1065,9 @@ function renderDiario(){
       return;
     }
 
-    card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '');
+    card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '') + (isPerfect ? ' perfect-score' : '');
     if(color) card.style.borderLeftColor = color;
+    if(isPerfect) card.style.borderLeftColor = '';
     card.innerHTML = `
       <div class="mc-main">
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
@@ -1072,7 +1075,7 @@ function renderDiario(){
         <div class="m-title">${escapeHtml(e.title)}</div>
       </div>
       <div class="m-ratings">
-        ${media!=null ? `<span class="m-media-badge">${formatNum(media)}</span>` : ''}
+        ${media!=null ? `<span class="m-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? '⭐ ' : ''}${formatNum(media)}</span>` : ''}
         <div class="m-rate-sub">
           ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
           ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
@@ -1829,15 +1832,16 @@ function renderProfile(){
     topList.innerHTML = '<div class="profile-empty">Avaliem alguns filmes no Diário pra ver o ranking aqui.</div>';
   } else {
     stats.top5.forEach((x,i)=>{
+      const rowIsPerfect = x.media === 10;
       const row = document.createElement('div');
-      row.className = 'profile-rank-row';
+      row.className = 'profile-rank-row' + (rowIsPerfect ? ' perfect-score' : '');
       row.style.animationDelay = (i*0.06)+'s';
       row.innerHTML = `
         <div class="rank-num rank-${i+1}">${i+1}</div>
         <div class="m-poster">${x.e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
         <div class="m-info"><div class="m-title">${escapeHtml(x.e.title)}</div></div>
         <div class="m-ratings">
-          <span class="m-media-badge">${formatNum(x.media)}</span>
+          <span class="m-media-badge${rowIsPerfect ? ' perfect' : ''}">${rowIsPerfect ? '⭐ ' : ''}${formatNum(x.media)}</span>
           <div class="m-rate-sub">
             ${x.e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(x.e.notaPaulo)}</span>` : ''}
             ${x.e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(x.e.notaJulia)}</span>` : ''}
@@ -1927,15 +1931,6 @@ function setActiveTab(tab){
 }
 tabBtns.forEach(b => b.addEventListener('click', ()=>{ playClick(); setActiveTab(b.dataset.tab); }));
 
-const soundToggle = document.getElementById('soundToggle');
-function updateSoundToggle(){ soundToggle.textContent = soundOn ? '🔊' : '🔇'; }
-updateSoundToggle();
-soundToggle.addEventListener('click', ()=>{
-  soundOn = !soundOn;
-  localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
-  updateSoundToggle();
-  if(soundOn) playClick();
-});
 setActiveTab(activeTab);
 
 /* =====================================================
