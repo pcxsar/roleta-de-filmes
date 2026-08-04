@@ -651,21 +651,62 @@ function flareBurst(originEl){
 (function initSplashScreen(){
   const splash = document.getElementById('splashScreen');
   if(!splash) return;
-  const MIN_SPLASH_MS = 1300;
+  const MIN_SPLASH_MS = 2200;
+
+  // Título letra por letra
+  const titleEl = document.getElementById('splashTitle');
+  if(titleEl){
+    const text = 'Paulo & Julia no cinema';
+    titleEl.innerHTML = '';
+    [...text].forEach((ch, i)=>{
+      const span = document.createElement('span');
+      span.className = 'splash-letter';
+      span.textContent = ch === ' ' ? ' ' : ch;
+      span.style.animationDelay = (0.55 + i*0.032) + 's';
+      titleEl.appendChild(span);
+    });
+  }
+
+  // Frases trocando, tipo tela de carregamento de app de verdade
+  const phraseEl = document.getElementById('splashPhrase');
+  const phrases = ['Apagando as luzes…', 'Preparando a pipoca…', 'Ajustando as poltronas…', 'Girando o projetor…'];
+  let phraseIdx = 0;
+  const phraseTimer = setInterval(()=>{
+    phraseIdx = (phraseIdx + 1) % phrases.length;
+    if(phraseEl) phraseEl.textContent = phrases[phraseIdx];
+  }, 560);
+
+  // Barra + porcentagem sincronizadas com o tempo mínimo de exibição
+  const fillEl = document.getElementById('splashProgressFill');
+  const pctEl = document.getElementById('splashProgressPct');
+  const progressStart = Date.now();
+  const progressTimer = setInterval(()=>{
+    const t = Math.min(1, (Date.now() - progressStart) / MIN_SPLASH_MS);
+    const pct = Math.round(t * 100);
+    if(fillEl) fillEl.style.width = pct + '%';
+    if(pctEl) pctEl.textContent = pct + '%';
+    if(t >= 1) clearInterval(progressTimer);
+  }, 40);
+
   const startedAt = Date.now();
+  let hidden = false;
   function hideSplash(){
+    if(hidden) return;
+    hidden = true;
     const elapsed = Date.now() - startedAt;
     const wait = Math.max(0, MIN_SPLASH_MS - elapsed);
     setTimeout(()=>{
+      clearInterval(phraseTimer);
+      clearInterval(progressTimer);
       splash.classList.add('hide');
-      setTimeout(()=> splash.remove(), 600);
+      setTimeout(()=> splash.remove(), 650);
     }, wait);
   }
   if(document.readyState === 'complete'){
     hideSplash();
   } else {
     window.addEventListener('load', hideSplash);
-    setTimeout(hideSplash, 4000); // segurança: nunca trava mais que isso
+    setTimeout(hideSplash, 5000); // segurança: nunca trava mais que isso
   }
 })();
 

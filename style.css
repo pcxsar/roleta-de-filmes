@@ -32,70 +32,174 @@
   }
   ::selection{background:var(--magenta); color:#0a0512;}
 
-  /* ---------- Splash screen (vibe de app abrindo) ---------- */
+  /* ---------- Splash screen (abertura estilo cinema) ---------- */
   .splash-screen{
     position:fixed;
     inset:0;
     z-index:300;
+    overflow:hidden;
     background:
-      radial-gradient(ellipse 900px 600px at 50% -10%, rgba(255,63,176,.28), transparent 60%),
-      radial-gradient(ellipse 700px 500px at 100% 110%, rgba(139,92,246,.24), transparent 60%),
+      radial-gradient(ellipse 900px 600px at 50% -10%, rgba(255,63,176,.3), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 110%, rgba(139,92,246,.26), transparent 60%),
+      radial-gradient(ellipse 600px 500px at 0% 100%, rgba(47,230,209,.16), transparent 60%),
       var(--bg);
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    gap:26px;
-    transition:opacity .55s ease, visibility .55s ease;
+    gap:20px;
+    padding:16px;
+    transition:opacity .6s ease, visibility .6s ease;
   }
   .splash-screen.hide{opacity:0; visibility:hidden; pointer-events:none;}
+
+  .splash-sprocket-strip{
+    position:absolute; left:0; right:0;
+    height:15px;
+    background-color:rgba(255,204,77,.16);
+    background-repeat:repeat-x;
+    background-size:26px 15px;
+    background-image:radial-gradient(circle at 8px 8px, var(--bg) 3.1px, transparent 3.5px);
+    z-index:1;
+  }
+  .splash-sprocket-strip.top{top:0;}
+  .splash-sprocket-strip.bottom{bottom:0;}
+
+  .splash-spotlight{
+    position:absolute; inset:-20%;
+    background:conic-gradient(from 0deg at 50% 45%, transparent 0deg, rgba(255,204,77,.16) 12deg, transparent 34deg, transparent 360deg);
+    animation:splash-spin 5s linear infinite;
+    mix-blend-mode:screen;
+    pointer-events:none;
+  }
+  .splash-grain{
+    position:absolute; inset:0;
+    opacity:.05;
+    mix-blend-mode:overlay;
+    pointer-events:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
   .splash-photo-wrap{
     position:relative;
-    width:min(48vw, 190px);
+    z-index:2;
+    width:min(46vw, 176px);
     aspect-ratio:1/1;
     display:flex;
     align-items:center;
     justify-content:center;
+    margin-top:6px;
   }
   .splash-glow{
     position:absolute;
-    inset:-26%;
+    inset:-32%;
     border-radius:50%;
-    background:radial-gradient(circle, rgba(255,63,176,.5), rgba(139,92,246,.32) 45%, transparent 72%);
-    filter:blur(24px);
+    background:radial-gradient(circle, rgba(255,63,176,.55), rgba(139,92,246,.34) 45%, transparent 72%);
+    filter:blur(26px);
     animation:hero-glow-pulse 2s ease-in-out infinite;
   }
+  .splash-sprocket-ring{
+    position:absolute;
+    inset:-19%;
+    border-radius:50%;
+    background:repeating-conic-gradient(var(--gold) 0deg 5deg, transparent 5deg 17deg);
+    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 9px));
+    mask:radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 9px));
+    opacity:.8;
+    animation:splash-spin 7s linear infinite;
+  }
+  .splash-spin-ring{
+    position:absolute;
+    inset:-8%;
+    border-radius:50%;
+    background:conic-gradient(from 0deg, var(--gold), var(--magenta), var(--violet), var(--cyan), var(--gold));
+    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+    mask:radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+    animation:splash-spin-reverse 1.6s linear infinite;
+  }
+  @keyframes splash-spin{ to{ transform:rotate(360deg); } }
+  @keyframes splash-spin-reverse{ to{ transform:rotate(-360deg); } }
   .splash-photo{
     position:relative;
     width:100%;
     height:100%;
-    object-fit:contain;
-    filter:drop-shadow(0 18px 30px rgba(0,0,0,.55));
-    animation:hero-float 2.6s ease-in-out infinite;
-  }
-  .splash-particles{position:absolute; inset:-35%; pointer-events:none;}
-  .splash-loader{
-    width:44px; height:44px;
+    object-fit:cover;
     border-radius:50%;
-    background:conic-gradient(from 0deg, var(--gold), var(--magenta), var(--violet), var(--cyan), var(--gold));
-    animation:splash-spin .9s linear infinite;
-    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
-    mask:radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+    display:block;
+    filter:drop-shadow(0 18px 30px rgba(0,0,0,.55));
+    clip-path:circle(0% at 50% 50%);
+    animation:
+      splash-iris-open .9s cubic-bezier(.2,.8,.2,1) .25s forwards,
+      hero-float 2.6s ease-in-out 1.15s infinite;
   }
-  @keyframes splash-spin{ to{ transform:rotate(360deg); } }
+  @keyframes splash-iris-open{ to{ clip-path:circle(52% at 50% 50%); } }
+  .splash-particles{position:absolute; inset:-38%; pointer-events:none; z-index:3;}
+
   .splash-title{
+    position:relative; z-index:2;
     font-family:'Unbounded',sans-serif;
     font-weight:800;
-    font-size:14px;
-    letter-spacing:.04em;
+    font-size:clamp(18px,5.5vw,26px);
+    letter-spacing:.02em;
     text-transform:uppercase;
+    text-align:center;
+  }
+  .splash-letter{
+    display:inline-block;
+    opacity:0;
+    transform:translateY(14px);
+    animation:splash-letter-in .5s cubic-bezier(.2,.8,.2,1) forwards;
     background:linear-gradient(100deg, var(--gold) 0%, var(--magenta) 45%, var(--violet) 85%);
     -webkit-background-clip:text;
     background-clip:text;
     -webkit-text-fill-color:transparent;
   }
+  @keyframes splash-letter-in{ to{ opacity:1; transform:translateY(0); } }
+
+  .splash-phrase{
+    position:relative; z-index:2;
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:.03em;
+    min-height:16px;
+    animation:splash-fade-in .5s ease 1.3s both;
+  }
+  @keyframes splash-fade-in{ from{ opacity:0; } to{ opacity:1; } }
+
+  .splash-progress{
+    position:relative; z-index:2;
+    width:min(60vw, 200px);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    animation:splash-fade-in .5s ease 1.3s both;
+  }
+  .splash-progress-track{
+    flex:1;
+    height:5px;
+    border-radius:99px;
+    background:rgba(255,255,255,.08);
+    overflow:hidden;
+  }
+  .splash-progress-fill{
+    height:100%;
+    width:0%;
+    border-radius:99px;
+    background:linear-gradient(90deg, var(--gold), var(--magenta), var(--violet));
+  }
+  .splash-progress-pct{
+    font-family:'Unbounded',sans-serif;
+    font-size:11px;
+    font-weight:700;
+    color:var(--gold);
+    min-width:32px;
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+
   @media (prefers-reduced-motion: reduce){
-    .splash-glow, .splash-photo, .splash-loader{animation:none !important;}
+    .splash-glow, .splash-photo, .splash-spotlight,
+    .splash-sprocket-ring, .splash-spin-ring, .splash-letter{animation:none !important; opacity:1; clip-path:circle(52% at 50% 50%);}
   }
 
   /* ---------- Ambient background: aurora blobs + grain ---------- */

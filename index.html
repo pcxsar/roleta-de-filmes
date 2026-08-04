@@ -20,13 +20,27 @@
 <body>
 
 <div class="splash-screen" id="splashScreen">
+  <div class="splash-sprocket-strip top"></div>
+  <div class="splash-spotlight"></div>
+  <div class="splash-grain"></div>
+
   <div class="splash-photo-wrap">
     <div class="splash-glow"></div>
+    <div class="splash-sprocket-ring"></div>
+    <div class="splash-spin-ring"></div>
     <img class="splash-photo" src="https://res.cloudinary.com/dam2gd3fj/image/upload/v1785766129/n%C3%B3s_tezcx6.png" alt="Paulo e Julia">
     <div class="splash-particles" id="splashParticles"></div>
   </div>
-  <div class="splash-loader"></div>
-  <div class="splash-title">Paulo &amp; Julia no cinema</div>
+
+  <div class="splash-title" id="splashTitle"></div>
+  <div class="splash-phrase" id="splashPhrase">Apagando as luzes…</div>
+
+  <div class="splash-progress">
+    <div class="splash-progress-track"><div class="splash-progress-fill" id="splashProgressFill"></div></div>
+    <div class="splash-progress-pct" id="splashProgressPct">0%</div>
+  </div>
+
+  <div class="splash-sprocket-strip bottom"></div>
 </div>
 
 <div class="bg-scrim"></div>
