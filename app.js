@@ -624,6 +624,51 @@ function flareBurst(originEl){
   }
 })();
 
+// Partículas da tela de abertura (mesmo visual das da foto no topo)
+(function initSplashParticles(){
+  const container = document.getElementById('splashParticles');
+  if(!container) return;
+  const colors = ['#ffcc4d', '#ff3fb0', '#2fe6d1', '#8b5cf6'];
+  for(let i=0;i<10;i++){
+    const p = document.createElement('div');
+    p.className = 'hero-particle';
+    const angle = Math.random()*Math.PI*2;
+    const dist = 34 + Math.random()*46;
+    p.style.left = (50 + Math.cos(angle)*18) + '%';
+    p.style.top = (50 + Math.sin(angle)*18) + '%';
+    p.style.setProperty('--px', Math.cos(angle)*dist + 'px');
+    p.style.setProperty('--py', Math.sin(angle)*dist + 'px');
+    p.style.color = colors[i % colors.length];
+    p.style.background = colors[i % colors.length];
+    p.style.animationDelay = (Math.random()*3) + 's';
+    p.style.animationDuration = (2.4 + Math.random()*1.8) + 's';
+    container.appendChild(p);
+  }
+})();
+
+// Esconde a tela de abertura depois que a página carregar de verdade,
+// com um tempo mínimo pra animação não "piscar" em conexões rápidas.
+(function initSplashScreen(){
+  const splash = document.getElementById('splashScreen');
+  if(!splash) return;
+  const MIN_SPLASH_MS = 1300;
+  const startedAt = Date.now();
+  function hideSplash(){
+    const elapsed = Date.now() - startedAt;
+    const wait = Math.max(0, MIN_SPLASH_MS - elapsed);
+    setTimeout(()=>{
+      splash.classList.add('hide');
+      setTimeout(()=> splash.remove(), 600);
+    }, wait);
+  }
+  if(document.readyState === 'complete'){
+    hideSplash();
+  } else {
+    window.addEventListener('load', hideSplash);
+    setTimeout(hideSplash, 4000); // segurança: nunca trava mais que isso
+  }
+})();
+
 // Partículas ambiente sutis no fundo (decorativo, não interativo)
 (function initSparkles(){
   const container = document.getElementById('sparkles');
