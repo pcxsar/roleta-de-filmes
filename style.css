@@ -335,8 +335,10 @@
   .tabs{
     display:flex;
     gap:6px;
-    max-width:440px;
+    max-width:476px;
     margin:24px auto 0;
+    padding:0 18px;
+    box-sizing:border-box;
   }
   .tab-btn, .mode-btn{
     flex:1;
@@ -365,7 +367,7 @@
   @media (min-width:420px){
     .tab-btn, .mode-btn{font-size:12.5px; padding:12px 8px;}
   }
-  .tabs-sub{max-width:320px; margin:0 auto;}
+  .tabs-sub{max-width:360px; margin:0 auto; padding:0 18px; box-sizing:border-box;}
   .tabs-sub .mode-btn{padding:9px 8px; font-size:11.5px;}
   .profile-top-filter{display:flex; gap:8px; margin-bottom:14px;}
   .profile-top-filter .mode-btn{flex:none; padding:8px 16px; font-size:12px;}
@@ -463,7 +465,7 @@
     color:var(--muted);
   }
 
-  .progress-wrap{max-width:420px; margin:14px auto 0;}
+  .progress-wrap{max-width:420px; margin:14px auto 0; padding:0 18px; box-sizing:border-box;}
   .progress-track{
     height:8px;
     border-radius:99px;
