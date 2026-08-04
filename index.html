@@ -686,6 +686,7 @@
   .movie-card.mc-stacked{flex-direction:column; align-items:stretch; gap:8px;}
   .mc-main{display:flex; align-items:center; gap:12px;}
   .mc-genres{display:flex; flex-wrap:wrap; gap:5px; padding-left:50px;}
+  .m-genres-inline{display:flex; flex-wrap:wrap; gap:5px; margin-top:4px;}
   .movie-card.done{background:linear-gradient(180deg, rgba(47,230,168,.08), var(--panel));}
   .m-poster{
     width:38px; min-width:38px;
@@ -2769,15 +2770,13 @@ function renderWatchlist(){
   filtered.forEach(e=>{
     const genresHtml = genreChipsHtml(entryGenres(e));
     const card = document.createElement('div');
-    card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '');
+    card.className = 'movie-card';
     card.innerHTML = `
-      <div class="mc-main">
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
+        ${genresHtml ? `<div class="m-genres-inline">${genresHtml}</div>` : ''}
       </div>
-      </div>
-      ${genresHtml ? `<div class="mc-genres">${genresHtml}</div>` : ''}
     `;
     card.addEventListener('click', ()=> openWatchlistModal(e));
     watchlistGrid.appendChild(card);
