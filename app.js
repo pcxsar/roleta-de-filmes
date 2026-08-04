@@ -972,6 +972,14 @@ const diarioEmpty = document.getElementById('diarioEmpty');
 const diarioSearch = document.getElementById('diarioSearch');
 let activeDiarioSort = 'recent';
 
+const DIARIO_VIEW_KEY = 'cinema-pj-diario-view';
+let diarioView = localStorage.getItem(DIARIO_VIEW_KEY) || 'list';
+
+function primaryGenreColor(e){
+  const gs = entryGenres(e).map(genreById).filter(Boolean);
+  return gs.length ? gs[0].color : null;
+}
+
 function renderDiario(){
   const q = diarioSearch.value.trim().toLowerCase();
   const genreFilter = diarioGenreFilter.getValue();
@@ -979,13 +987,35 @@ function renderDiario(){
     .filter(e => !q || e.title.toLowerCase().includes(q))
     .filter(e => !genreFilter || entryGenres(e).includes(genreFilter));
   const sorted = sortDiario(filtered, activeDiarioSort);
+  diarioGrid.className = diarioView === 'mural' ? 'diario-mural' : 'movie-grid';
   diarioGrid.innerHTML = '';
 
   sorted.forEach(e=>{
     const genresHtml = genreChipsHtml(entryGenres(e));
     const media = computeMedia(e);
+    const color = primaryGenreColor(e);
     const card = document.createElement('div');
+
+    if(diarioView === 'mural'){
+      card.className = 'mural-card';
+      card.innerHTML = `
+        <div class="mural-poster"><div class="skeleton-poster"></div></div>
+        ${media!=null ? `<div class="mural-media-badge">${formatNum(media)}</div>` : ''}
+        <div class="mural-overlay">${color ? `<span class="mural-dot" style="background:${color}"></span>` : ''}${escapeHtml(e.title)}</div>
+      `;
+      card.addEventListener('click', ()=> openDiarioModal(e));
+      diarioGrid.appendChild(card);
+      const muralPosterEl = card.querySelector('.mural-poster');
+      if(e.poster){
+        muralPosterEl.innerHTML = `<img src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
+      } else {
+        lazyLoadPoster(muralPosterEl, {id:e.id, t:e.title, y:''}, '');
+      }
+      return;
+    }
+
     card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '');
+    if(color) card.style.borderLeftColor = color;
     card.innerHTML = `
       <div class="mc-main">
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
@@ -1014,6 +1044,23 @@ function renderDiario(){
 
   diarioEmpty.style.display = sorted.length===0 ? 'block' : 'none';
 }
+
+const diarioViewToggle = document.getElementById('diarioViewToggle');
+function updateDiarioViewToggle(){
+  [...diarioViewToggle.children].forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.view === diarioView);
+  });
+}
+diarioViewToggle.addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('.view-toggle-btn');
+  if(!btn) return;
+  playClick();
+  diarioView = btn.dataset.view;
+  localStorage.setItem(DIARIO_VIEW_KEY, diarioView);
+  updateDiarioViewToggle();
+  renderDiario();
+});
+updateDiarioViewToggle();
 
 function updateDiarioStats(){
   document.getElementById('dTotal').textContent = diario.length;
@@ -1185,6 +1232,7 @@ diarioModalSave.addEventListener('click', ()=>{
   const j = clampRating(diarioRateJulia.value);
   const obs = diarioObsInput.value.trim();
   const genres = diarioGenrePicker.getValues();
+  const wasNewEntry = !diarioEditId;
 
   let entryId = diarioEditId;
   let addedAt = Date.now();
@@ -1211,6 +1259,13 @@ diarioModalSave.addEventListener('click', ()=>{
     diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genres, oscarId:currentDiarioOscarId });
   }
   saveDiarioLocal();
+
+  if(wasNewEntry){
+    burstConfetti(diarioModalSave);
+    flareBurst(diarioModalSave);
+    playChime();
+    if(navigator.vibrate) navigator.vibrate([30,40,70]);
+  }
 
   const finishedConvertingId = convertingWatchlistId;
   const linkedOscarId = currentDiarioOscarId;
@@ -1330,8 +1385,10 @@ function renderWatchlist(){
 
   filtered.forEach(e=>{
     const genresHtml = genreChipsHtml(entryGenres(e));
+    const color = primaryGenreColor(e);
     const card = document.createElement('div');
     card.className = 'movie-card';
+    if(color) card.style.borderLeftColor = color;
     card.innerHTML = `
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
