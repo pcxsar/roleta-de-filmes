@@ -50,12 +50,21 @@
   }
   .splash-screen.hide{opacity:0; visibility:hidden; pointer-events:none;}
 
-  .splash-spotlight{
-    position:absolute; inset:-20%;
-    background:conic-gradient(from 0deg at 50% 45%, transparent 0deg, rgba(255,204,77,.18) 12deg, transparent 34deg, transparent 360deg);
-    animation:splash-spin 6s linear infinite;
+  .splash-glow-bg{position:absolute; inset:0; pointer-events:none; overflow:hidden;}
+  .splash-glow-bg span{
+    position:absolute;
+    border-radius:50%;
+    filter:blur(90px);
+    opacity:.5;
     mix-blend-mode:screen;
-    pointer-events:none;
+    animation:splash-blob-drift 7s ease-in-out infinite alternate;
+  }
+  .splash-glow-bg span:nth-child(1){width:75vmax; height:75vmax; background:var(--magenta); top:-20%; left:-15%; animation-duration:8s;}
+  .splash-glow-bg span:nth-child(2){width:65vmax; height:65vmax; background:var(--violet); bottom:-22%; right:-15%; animation-duration:6.5s; animation-delay:-2.5s;}
+  .splash-glow-bg span:nth-child(3){width:55vmax; height:55vmax; background:var(--cyan); bottom:5%; left:10%; opacity:.32; animation-duration:9s; animation-delay:-4.5s;}
+  @keyframes splash-blob-drift{
+    0%{ transform:translate(0,0) scale(1); }
+    100%{ transform:translate(6%,7%) scale(1.18); }
   }
   .splash-grain{
     position:absolute; inset:0;
@@ -138,7 +147,7 @@
   .splash-particles{position:absolute; inset:-40%; pointer-events:none; z-index:3;}
 
   @media (prefers-reduced-motion: reduce){
-    .splash-glow, .splash-spotlight, .splash-sprocket-ring, .splash-spin-ring{
+    .splash-glow, .splash-glow-bg span, .splash-sprocket-ring, .splash-spin-ring{
       animation:none !important;
       opacity:1;
     }
