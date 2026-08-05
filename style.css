@@ -1360,6 +1360,96 @@
   .modal-remove:hover{color:var(--danger); border-color:var(--danger);}
   .modal-remove:active{transform:scale(.98);}
 
+  /* ---------- Tela de leitura do filme (Diário/Watchlist) ---------- */
+  .view-card{
+    max-width:420px;
+    padding:0 0 24px !important;
+    overflow:hidden;
+    max-height:90vh;
+    overflow-y:auto;
+  }
+  .view-photo{
+    width:100%;
+    aspect-ratio:2/3;
+    background:linear-gradient(160deg, var(--violet-deep), var(--magenta-deep));
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+    font-size:44px;
+  }
+  .view-photo img{width:100%; height:100%; object-fit:cover; display:block;}
+  .view-card .modal-close{
+    top:14px; right:14px;
+    background:rgba(6,5,18,.55);
+    border-color:rgba(255,255,255,.25);
+    backdrop-filter:blur(3px);
+  }
+  .view-body{padding:22px 24px 4px;}
+  .view-genres{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;}
+  .view-title{
+    font-family:'Unbounded',sans-serif;
+    font-weight:700;
+    font-size:21px;
+    line-height:1.2;
+    margin:0 0 8px;
+    color:var(--text);
+  }
+  .view-meta{display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:var(--muted); margin-bottom:4px;}
+  .view-meta span{display:inline-flex; align-items:center; gap:5px;}
+
+  .view-rating{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+    padding:14px 16px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+  }
+  .view-rating-item{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+  .view-rating-item strong{
+    font-family:'Unbounded',sans-serif;
+    font-size:20px;
+    color:var(--text);
+    text-transform:none;
+    letter-spacing:0;
+  }
+
+  .view-section{margin-top:22px;}
+  .view-section h3{
+    display:flex; align-items:center; gap:8px;
+    font-family:'Unbounded',sans-serif;
+    font-size:12.5px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--gold);
+    margin:0 0 8px;
+  }
+  .view-section p{
+    margin:0;
+    font-size:13.5px;
+    line-height:1.65;
+    color:#ded7f0;
+  }
+  .view-edit-btn{
+    background:transparent !important;
+    color:var(--gold) !important;
+    border:1px solid var(--line);
+    box-shadow:none;
+  }
+  .view-edit-btn:hover{filter:none !important; border-color:var(--gold);}
+  .view-card .modal-actions{margin-top:26px;}
+
   /* ---------- Tablet / desktop tune-ups (mobile-first: base = phone) ---------- */
   @media (min-width:600px){
     header{padding:56px 20px 30px;}

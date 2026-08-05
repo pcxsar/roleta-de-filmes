@@ -894,7 +894,7 @@ function openRatingForOscarMovie(movieId){
   const movie = ALL_OSCAR_WINNERS[movieId];
   const existingEntry = diario.find(e => e.oscarId === movieId);
   if(existingEntry){
-    openDiarioModal(existingEntry);
+    openMovieView(existingEntry, 'diario');
   } else {
     const existingRating = data[movieId] || {};
     openDiarioModal(null, {
@@ -1068,7 +1068,7 @@ function renderDiario(){
         ${media!=null ? `<div class="mural-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? iconHtml('star')+' ' : ''}${formatNum(media)}</div>` : ''}
         <div class="mural-overlay">${color ? `<span class="mural-dot" style="background:${color}"></span>` : ''}${escapeHtml(e.title)}</div>
       `;
-      card.addEventListener('click', ()=> openDiarioModal(e));
+      card.addEventListener('click', ()=> openMovieView(e, 'diario'));
       diarioGrid.appendChild(card);
       const muralPosterEl = card.querySelector('.mural-poster');
       if(e.poster){
@@ -1098,7 +1098,7 @@ function renderDiario(){
       </div>
       ${genresHtml ? `<div class="mc-genres">${genresHtml}</div>` : ''}
     `;
-    card.addEventListener('click', ()=> openDiarioModal(e));
+    card.addEventListener('click', ()=> openMovieView(e, 'diario'));
     diarioGrid.appendChild(card);
     const posterEl = card.querySelector('.m-poster');
     if(e.poster){
@@ -1482,7 +1482,7 @@ function renderWatchlist(){
           ${genresHtml ? `<div class="mural-genres">${genresHtml}</div>` : ''}
         </div>
       `;
-      card.addEventListener('click', ()=> openWatchlistModal(e));
+      card.addEventListener('click', ()=> openMovieView(e, 'watchlist'));
       watchlistGrid.appendChild(card);
       const muralPosterEl = card.querySelector('.mural-poster');
       if(e.poster){
@@ -1502,7 +1502,7 @@ function renderWatchlist(){
         ${genresHtml ? `<div class="m-genres-inline">${genresHtml}</div>` : ''}
       </div>
     `;
-    card.addEventListener('click', ()=> openWatchlistModal(e));
+    card.addEventListener('click', ()=> openMovieView(e, 'watchlist'));
     watchlistGrid.appendChild(card);
     const posterEl = card.querySelector('.m-poster');
     if(e.poster){
@@ -1633,10 +1633,111 @@ watchlistModalClose.addEventListener('click', closeWatchlistModal);
 watchlistModalOverlay.addEventListener('click', (e)=>{ if(e.target === watchlistModalOverlay) closeWatchlistModal(); });
 watchlistSearch.addEventListener('input', renderWatchlist);
 
+/* =====================================================
+   TELA DE LEITURA — abre ao clicar num filme do Diário ou
+   da Watchlist, com pôster, gêneros, nota (Diário) ou
+   sinopse (Watchlist). A edição só acontece explicitamente
+   pelo botão "Editar".
+===================================================== */
+const movieViewOverlay = document.getElementById('movieViewOverlay');
+const movieViewClose = document.getElementById('movieViewClose');
+const movieViewPhoto = document.getElementById('movieViewPhoto');
+const movieViewGenres = document.getElementById('movieViewGenres');
+const movieViewTitle = document.getElementById('movieViewTitle');
+const movieViewMeta = document.getElementById('movieViewMeta');
+const movieViewRating = document.getElementById('movieViewRating');
+const movieViewRatingPaulo = document.getElementById('movieViewRatingPaulo');
+const movieViewRatingJulia = document.getElementById('movieViewRatingJulia');
+const movieViewObsSection = document.getElementById('movieViewObsSection');
+const movieViewObsTitle = document.getElementById('movieViewObsTitle');
+const movieViewObsText = document.getElementById('movieViewObsText');
+const movieViewEditBtn = document.getElementById('movieViewEditBtn');
+const movieViewMarkWatchedBtn = document.getElementById('movieViewMarkWatchedBtn');
+
+let viewingMovieEntry = null;
+let viewingMovieKind = null; // 'diario' | 'watchlist'
+
+function openMovieView(entry, kind){
+  viewingMovieEntry = entry;
+  viewingMovieKind = kind;
+
+  movieViewPhoto.innerHTML = '<div class="skeleton-poster"></div>';
+  if(entry.poster){
+    movieViewPhoto.innerHTML = `<img src="${entry.poster}" alt="${escapeHtml(entry.title)}">`;
+  } else {
+    getMovieInfo({ id: entry.id, t: entry.title, y: '' }).then(info=>{
+      if(viewingMovieEntry !== entry) return;
+      movieViewPhoto.innerHTML = (info && info.found && info.image)
+        ? `<img src="${info.image}" alt="${escapeHtml(entry.title)}" onerror="handlePosterError(this)">`
+        : posterPlaceholderHTML;
+    }).catch(()=>{
+      if(viewingMovieEntry === entry) movieViewPhoto.innerHTML = posterPlaceholderHTML;
+    });
+  }
+
+  const genresHtml = genreChipsHtml(entryGenres(entry));
+  movieViewGenres.innerHTML = genresHtml;
+  movieViewGenres.style.display = genresHtml ? 'flex' : 'none';
+
+  movieViewTitle.textContent = entry.title;
+
+  if(kind === 'diario' && entry.where){
+    const whereIcon = entry.where === 'Cinema' ? 'clapperboard' : 'sofa';
+    movieViewMeta.innerHTML = `<span>${iconHtml(whereIcon)} ${escapeHtml(entry.where)}</span>`;
+    movieViewMeta.style.display = 'flex';
+  } else {
+    movieViewMeta.style.display = 'none';
+  }
+
+  if(kind === 'diario'){
+    movieViewRating.style.display = 'flex';
+    movieViewRatingPaulo.textContent = entry.notaPaulo!=null ? formatNum(entry.notaPaulo) : '—';
+    movieViewRatingJulia.textContent = entry.notaJulia!=null ? formatNum(entry.notaJulia) : '—';
+  } else {
+    movieViewRating.style.display = 'none';
+  }
+
+  const obsContent = kind === 'diario' ? entry.obs : entry.description;
+  movieViewObsTitle.textContent = kind === 'diario' ? 'Nossa resenha' : 'Sinopse';
+  if(obsContent){
+    movieViewObsSection.style.display = 'block';
+    movieViewObsText.textContent = obsContent;
+  } else {
+    movieViewObsSection.style.display = 'none';
+  }
+
+  movieViewMarkWatchedBtn.style.display = kind === 'watchlist' ? 'flex' : 'none';
+
+  movieViewOverlay.classList.add('open');
+}
+function closeMovieView(){
+  movieViewOverlay.classList.remove('open');
+  viewingMovieEntry = null;
+  viewingMovieKind = null;
+}
+movieViewClose.addEventListener('click', closeMovieView);
+movieViewOverlay.addEventListener('click', (e)=>{ if(e.target === movieViewOverlay) closeMovieView(); });
+
+movieViewEditBtn.addEventListener('click', ()=>{
+  const entry = viewingMovieEntry, kind = viewingMovieKind;
+  closeMovieView();
+  if(kind === 'diario') openDiarioModal(entry);
+  else openWatchlistModal(entry);
+});
+movieViewMarkWatchedBtn.addEventListener('click', ()=>{
+  if(!viewingMovieEntry) return;
+  const entry = viewingMovieEntry;
+  playClick();
+  closeMovieView();
+  convertingWatchlistId = entry.id;
+  openDiarioModal(null, { title: entry.title, poster: entry.poster, genres: entryGenres(entry) });
+});
+
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Escape') return;
   if(diarioModalOverlay.classList.contains('open')) closeDiarioModal();
   if(watchlistModalOverlay.classList.contains('open')) closeWatchlistModal();
+  if(movieViewOverlay.classList.contains('open')) closeMovieView();
 });
 
 /* =====================================================

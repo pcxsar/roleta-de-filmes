@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -130,6 +130,10 @@
   <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
   <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
   <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+</symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24">
+  <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+  <path d="m15 5 4 4" />
 </symbol>
 <symbol id="i-popcorn" viewBox="0 0 24 24">
   <path d="M18 8a2 2 0 0 0 0-4 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0 0 4" />
@@ -579,12 +583,50 @@
   </div>
 </div>
 
+<!-- ==================== TELA DE LEITURA DO FILME ==================== -->
+<div class="modal-overlay" id="movieViewOverlay">
+  <div class="modal-card view-card">
+    <div class="modal-close" id="movieViewClose"><svg class="icon"><use href="#i-x"/></svg></div>
+
+    <div class="view-photo" id="movieViewPhoto"></div>
+
+    <div class="view-body">
+      <div class="view-genres" id="movieViewGenres"></div>
+      <h2 class="view-title" id="movieViewTitle"></h2>
+      <div class="view-meta" id="movieViewMeta"></div>
+
+      <div class="view-rating" id="movieViewRating" style="display:none;">
+        <div class="view-rating-item">
+          <span class="rate-dot p"></span>
+          <span>Paulo</span>
+          <strong id="movieViewRatingPaulo">—</strong>
+        </div>
+        <div class="view-rating-item">
+          <span class="rate-dot j"></span>
+          <span>Julia</span>
+          <strong id="movieViewRatingJulia">—</strong>
+        </div>
+      </div>
+
+      <div class="view-section" id="movieViewObsSection">
+        <h3><svg class="icon"><use href="#i-book-open"/></svg> <span id="movieViewObsTitle">Nossa resenha</span></h3>
+        <p id="movieViewObsText"></p>
+      </div>
+
+      <div class="modal-actions">
+        <button class="modal-mark-watched" id="movieViewMarkWatchedBtn" style="display:none;"><svg class="icon"><use href="#i-check"/></svg> Já assisti — mover pro Diário</button>
+        <button class="modal-save view-edit-btn" id="movieViewEditBtn"><svg class="icon"><use href="#i-pencil"/></svg> Editar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <button class="fab" id="fabSpin" aria-label="Girar a roleta"><svg class="icon"><use href="#i-dices"/></svg></button>
 
 <footer>
   Feito para Paulo &amp; Julia <span class="heart">♥</span> — filme por filme, sessão por sessão.
 </footer>
 
-<script type="module" src="app.js?v=5"></script>
+<script type="module" src="app.js?v=6"></script>
 </body>
 </html>
