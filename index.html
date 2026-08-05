@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -114,7 +114,13 @@
     <div class="list-head">
       <div class="list-head-top">
         <h2>Quero ver</h2>
-        <button class="add-btn" id="addWatchlistBtn">+ Adicionar</button>
+        <div class="list-head-actions">
+          <div class="view-toggle" id="watchlistViewToggle">
+            <button class="view-toggle-btn active" data-view="list" aria-label="Ver como lista">☰</button>
+            <button class="view-toggle-btn" data-view="mural" aria-label="Ver como mural">▦</button>
+          </div>
+          <button class="add-btn" id="addWatchlistBtn">+ Adicionar</button>
+        </div>
       </div>
       <input type="text" class="search" id="watchlistSearch" placeholder="Buscar filme…">
       <div id="watchlistGenreFilterRow" style="margin-top:10px;"></div>
@@ -307,6 +313,7 @@
     </div>
 
     <input type="text" class="search diario-title-input" id="diarioTitleInput" placeholder="Nome do filme">
+    <div class="dup-warning" id="diarioDupWarning" style="display:none;">⚠️ Esse filme já está no seu Diário.</div>
 
     <span class="field-label">Onde assistiram</span>
     <div class="chip-row" style="padding-top:0;">
@@ -360,6 +367,7 @@
     </div>
 
     <input type="text" class="search diario-title-input" id="watchlistTitleInput" placeholder="Nome do filme">
+    <div class="dup-warning" id="watchlistDupWarning" style="display:none;">⚠️ Esse filme já está na sua lista.</div>
 
     <span class="field-label">Categoria</span>
     <div id="watchlistGenreRow"></div>
@@ -381,6 +389,6 @@
   Feito para Paulo &amp; Julia <span class="heart">♥</span> — filme por filme, sessão por sessão.
 </footer>
 
-<script type="module" src="app.js?v=3"></script>
+<script type="module" src="app.js?v=4"></script>
 </body>
 </html>

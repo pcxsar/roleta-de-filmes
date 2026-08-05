@@ -190,6 +190,11 @@ const MOVIE_GENRES = [
 function genreById(id){ return MOVIE_GENRES.find(g => g.id === id) || null; }
 // Lê os gêneros de um filme já normalizados em array — compatível com
 // registros antigos que ainda tinham só "genre" (uma categoria só).
+// Normaliza título pra comparação (ignora espaços extras, maiúsculas e acentos)
+function normalizeTitle(t){
+  return (t || '').trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
 function entryGenres(e){
   if(!e) return [];
   if(Array.isArray(e.genres)) return e.genres.filter(Boolean);
@@ -994,6 +999,12 @@ function saveDiarioLocal(){
 }
 let diario = loadDiario();
 
+function findDuplicateDiario(title, excludeId){
+  const norm = normalizeTitle(title);
+  if(!norm) return null;
+  return diario.find(e => e.id !== excludeId && normalizeTitle(e.title) === norm) || null;
+}
+
 function computeMedia(e){
   const p = e.notaPaulo, j = e.notaJulia;
   if(p!=null && j!=null) return (p+j)/2;
@@ -1145,6 +1156,7 @@ const diarioGenreFilter = createGenreDropdown(document.getElementById('diarioGen
 const diarioModalOverlay = document.getElementById('diarioModalOverlay');
 const diarioModalEyebrow = document.getElementById('diarioModalEyebrow');
 const diarioTitleInput = document.getElementById('diarioTitleInput');
+const diarioDupWarning = document.getElementById('diarioDupWarning');
 const whereCinemaChip = document.getElementById('whereCinema');
 const whereCasaChip = document.getElementById('whereCasa');
 const diarioRatePaulo = document.getElementById('diarioRatePaulo');
@@ -1242,6 +1254,7 @@ function openDiarioModal(entry, prefill){
   currentDiarioOscarId = entry ? (entry.oscarId ?? null) : ((prefill && prefill.oscarId != null) ? prefill.oscarId : null);
   diarioModalEyebrow.textContent = entry ? 'Editar filme' : 'Novo filme';
   diarioTitleInput.value = entry ? entry.title : ((prefill && prefill.title) || '');
+  updateDiarioDupWarning();
   selectedWhere = entry ? entry.where : null;
   updateWhereChips();
   diarioGenrePicker.setValues(entry ? entryGenres(entry) : ((prefill && prefill.genres) || []));
@@ -1273,6 +1286,12 @@ function closeDiarioModal(){
   convertingWatchlistId = null;
   currentDiarioOscarId = null;
 }
+
+function updateDiarioDupWarning(){
+  const dup = findDuplicateDiario(diarioTitleInput.value, diarioEditId);
+  diarioDupWarning.style.display = dup ? 'block' : 'none';
+}
+diarioTitleInput.addEventListener('input', updateDiarioDupWarning);
 
 addMovieBtn.addEventListener('click', ()=>{ playClick(); openDiarioModal(null); });
 
@@ -1395,6 +1414,15 @@ function saveWatchlistLocal(){
 }
 let watchlist = loadWatchlist();
 
+function findDuplicateWatchlist(title, excludeId){
+  const norm = normalizeTitle(title);
+  if(!norm) return null;
+  return watchlist.find(e => e.id !== excludeId && normalizeTitle(e.title) === norm) || null;
+}
+
+const WATCHLIST_VIEW_KEY = 'cinema-pj-watchlist-view';
+let watchlistView = localStorage.getItem(WATCHLIST_VIEW_KEY) || 'list';
+
 const watchlistGrid = document.getElementById('watchlistGrid');
 const watchlistEmpty = document.getElementById('watchlistEmpty');
 const watchlistSearch = document.getElementById('watchlistSearch');
@@ -1402,6 +1430,7 @@ const addWatchlistBtn = document.getElementById('addWatchlistBtn');
 const watchlistModalOverlay = document.getElementById('watchlistModalOverlay');
 const watchlistModalEyebrow = document.getElementById('watchlistModalEyebrow');
 const watchlistTitleInput = document.getElementById('watchlistTitleInput');
+const watchlistDupWarning = document.getElementById('watchlistDupWarning');
 const watchlistDescInput = document.getElementById('watchlistDescInput');
 const watchlistModalSave = document.getElementById('watchlistModalSave');
 const watchlistModalRemove = document.getElementById('watchlistModalRemove');
@@ -1433,12 +1462,34 @@ function renderWatchlist(){
     .filter(e => !q || e.title.toLowerCase().includes(q))
     .filter(e => { const g = watchlistGenreFilter.getValue(); return !g || entryGenres(e).includes(g); })
     .sort((a,b) => b.addedAt - a.addedAt);
+  watchlistGrid.className = watchlistView === 'mural' ? 'diario-mural' : 'movie-grid';
   watchlistGrid.innerHTML = '';
 
   filtered.forEach(e=>{
     const genresHtml = genreChipsHtml(entryGenres(e));
     const color = primaryGenreColor(e);
     const card = document.createElement('div');
+
+    if(watchlistView === 'mural'){
+      card.className = 'mural-card';
+      card.innerHTML = `
+        <div class="mural-poster"><div class="skeleton-poster"></div></div>
+        <div class="mural-overlay">
+          <div>${color ? `<span class="mural-dot" style="background:${color}"></span>` : ''}${escapeHtml(e.title)}</div>
+          ${genresHtml ? `<div class="mural-genres">${genresHtml}</div>` : ''}
+        </div>
+      `;
+      card.addEventListener('click', ()=> openWatchlistModal(e));
+      watchlistGrid.appendChild(card);
+      const muralPosterEl = card.querySelector('.mural-poster');
+      if(e.poster){
+        muralPosterEl.innerHTML = `<img src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
+      } else {
+        lazyLoadPoster(muralPosterEl, {id:e.id, t:e.title, y:''}, '');
+      }
+      return;
+    }
+
     card.className = 'movie-card';
     if(color) card.style.borderLeftColor = color;
     card.innerHTML = `
@@ -1465,10 +1516,28 @@ function updateWatchlistStats(){
   document.getElementById('wTotal').textContent = watchlist.length;
 }
 
+const watchlistViewToggle = document.getElementById('watchlistViewToggle');
+function updateWatchlistViewToggle(){
+  [...watchlistViewToggle.children].forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.view === watchlistView);
+  });
+}
+watchlistViewToggle.addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('.view-toggle-btn');
+  if(!btn) return;
+  playClick();
+  watchlistView = btn.dataset.view;
+  localStorage.setItem(WATCHLIST_VIEW_KEY, watchlistView);
+  updateWatchlistViewToggle();
+  renderWatchlist();
+});
+updateWatchlistViewToggle();
+
 function openWatchlistModal(entry){
   watchlistEditId = entry ? entry.id : null;
   watchlistModalEyebrow.textContent = entry ? 'Editar item' : 'Novo filme pra ver';
   watchlistTitleInput.value = entry ? entry.title : '';
+  updateWatchlistDupWarning();
   watchlistDescInput.value = entry ? (entry.description || '') : '';
   watchlistGenrePicker.setValues(entry ? entryGenres(entry) : []);
   watchlistModalRemove.style.display = entry ? 'block' : 'none';
@@ -1482,6 +1551,12 @@ function closeWatchlistModal(){
   watchlistModalOverlay.classList.remove('open');
   watchlistEditId = null;
 }
+
+function updateWatchlistDupWarning(){
+  const dup = findDuplicateWatchlist(watchlistTitleInput.value, watchlistEditId);
+  watchlistDupWarning.style.display = dup ? 'block' : 'none';
+}
+watchlistTitleInput.addEventListener('input', updateWatchlistDupWarning);
 
 addWatchlistBtn.addEventListener('click', ()=>{ playClick(); openWatchlistModal(null); });
 
