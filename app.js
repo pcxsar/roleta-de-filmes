@@ -165,27 +165,30 @@ function formatNum(n){
   const rounded = Math.round(n*100)/100;
   return String(rounded).replace('.', ',');
 }
-const posterPlaceholderHTML = `<div class="r-poster-placeholder">🎬</div>`;
+function iconHtml(name, cls){
+  return `<svg class="icon${cls ? ' '+cls : ''}"><use href="#i-${name}"/></svg>`;
+}
+const posterPlaceholderHTML = `<div class="r-poster-placeholder">${iconHtml('clapperboard')}</div>`;
 
 /* =====================================================
    Categorias de filme (usadas no Diário e na watchlist)
 ===================================================== */
 const MOVIE_GENRES = [
-  {id:'acao', emoji:'🎬', label:'Ação', color:'#ff3fb0'},
-  {id:'aventura', emoji:'🤠', label:'Aventura', color:'#ff9d4d'},
-  {id:'comedia', emoji:'😂', label:'Comédia', color:'#ffe14d'},
-  {id:'drama', emoji:'🎭', label:'Drama', color:'#8b5cf6'},
-  {id:'terror', emoji:'👻', label:'Terror', color:'#ff4d4d'},
-  {id:'suspense', emoji:'🔪', label:'Suspense', color:'#a855f7'},
-  {id:'ficcao', emoji:'🚀', label:'Ficção Científica', color:'#2fe6d1'},
-  {id:'fantasia', emoji:'🐉', label:'Fantasia', color:'#5eb8ff'},
-  {id:'romance', emoji:'💕', label:'Romance', color:'#ff6fa8'},
-  {id:'animacao', emoji:'🎨', label:'Animação', color:'#4dff88'},
-  {id:'documentario', emoji:'📽️', label:'Documentário', color:'#94a3b8'},
-  {id:'musical', emoji:'🎵', label:'Musical', color:'#ffcc4d'},
-  {id:'biografia', emoji:'📖', label:'Biografia', color:'#b08968'},
-  {id:'crime', emoji:'🕵️', label:'Crime', color:'#9f1239'},
-  {id:'guerra', emoji:'🪖', label:'Guerra', color:'#7c8a4a'},
+  {id:'acao', icon:'swords', label:'Ação', color:'#ff3fb0'},
+  {id:'aventura', icon:'compass', label:'Aventura', color:'#ff9d4d'},
+  {id:'comedia', icon:'laugh', label:'Comédia', color:'#ffe14d'},
+  {id:'drama', icon:'drama', label:'Drama', color:'#8b5cf6'},
+  {id:'terror', icon:'ghost', label:'Terror', color:'#ff4d4d'},
+  {id:'suspense', icon:'eye', label:'Suspense', color:'#a855f7'},
+  {id:'ficcao', icon:'rocket', label:'Ficção Científica', color:'#2fe6d1'},
+  {id:'fantasia', icon:'wand-2', label:'Fantasia', color:'#5eb8ff'},
+  {id:'romance', icon:'heart', label:'Romance', color:'#ff6fa8'},
+  {id:'animacao', icon:'palette', label:'Animação', color:'#4dff88'},
+  {id:'documentario', icon:'camera', label:'Documentário', color:'#94a3b8'},
+  {id:'musical', icon:'music', label:'Musical', color:'#ffcc4d'},
+  {id:'biografia', icon:'book-open', label:'Biografia', color:'#b08968'},
+  {id:'crime', icon:'fingerprint', label:'Crime', color:'#9f1239'},
+  {id:'guerra', icon:'shield', label:'Guerra', color:'#7c8a4a'},
 ];
 function genreById(id){ return MOVIE_GENRES.find(g => g.id === id) || null; }
 // Lê os gêneros de um filme já normalizados em array — compatível com
@@ -203,7 +206,7 @@ function entryGenres(e){
 }
 function genreChipsHtml(genreIds){
   return genreIds.map(genreById).filter(Boolean).map(g =>
-    `<span class="m-genre-chip" style="background:${g.color}26; color:${g.color};">${g.emoji} ${escapeHtml(g.label)}</span>`
+    `<span class="m-genre-chip" style="background:${g.color}26; color:${g.color};">${iconHtml(g.icon)} ${escapeHtml(g.label)}</span>`
   ).join('');
 }
 
@@ -235,13 +238,13 @@ function createGenreDropdown(mountEl, opts){
     const opt = document.createElement('div');
     opt.className = 'gd-option';
     opt.dataset.genre = g.id;
-    opt.innerHTML = `<span class="gd-dot" style="background:${g.color}"></span>${g.emoji} ${escapeHtml(g.label)}`;
+    opt.innerHTML = `<span class="gd-dot" style="background:${g.color}"></span>${iconHtml(g.icon)} ${escapeHtml(g.label)}`;
     menu.appendChild(opt);
   });
   function setValue(v){
     value = v || null;
     const g = genreById(value);
-    labelEl.textContent = g ? (g.emoji + ' ' + g.label) : allLabel;
+    labelEl.innerHTML = g ? (iconHtml(g.icon) + ' ' + escapeHtml(g.label)) : escapeHtml(allLabel);
     labelEl.style.color = g ? g.color : '';
     [...menu.children].forEach(opt=>{
       const active = (opt.dataset.genre || '') === (value || '');
@@ -297,7 +300,7 @@ function createGenreMultiPicker(mountEl, opts){
     const opt = document.createElement('div');
     opt.className = 'gd-option';
     opt.dataset.genre = g.id;
-    opt.innerHTML = `<span class="gd-dot" style="background:${g.color}"></span>${g.emoji} ${escapeHtml(g.label)}`;
+    opt.innerHTML = `<span class="gd-dot" style="background:${g.color}"></span>${iconHtml(g.icon)} ${escapeHtml(g.label)}`;
     menu.appendChild(opt);
   });
 
@@ -307,10 +310,10 @@ function createGenreMultiPicker(mountEl, opts){
       labelEl.textContent = emptyLabel;
       labelEl.style.color = '';
     } else if(genres.length === 1){
-      labelEl.textContent = genres[0].emoji + ' ' + genres[0].label;
+      labelEl.innerHTML = iconHtml(genres[0].icon) + ' ' + escapeHtml(genres[0].label);
       labelEl.style.color = genres[0].color;
     } else {
-      labelEl.textContent = genres.map(g=>g.emoji).join(' ') + ' ' + genres.length + ' categorias';
+      labelEl.innerHTML = genres.map(g=>iconHtml(g.icon)).join(' ') + ' ' + genres.length + ' categorias';
       labelEl.style.color = genres[0].color;
     }
     [...menu.children].forEach(opt=>{
@@ -858,7 +861,7 @@ function renderGrid(){
     card.style.borderLeftColor = DECADE_COLORS[decadeOf(m)];
     card.innerHTML = `
       <div class="m-poster"><div class="skeleton-poster"></div></div>
-      <div class="m-check">${done ? '✓' : ''}</div>
+      <div class="m-check">${done ? iconHtml('check') : ''}</div>
       <div class="m-year">${m.y}</div>
       <div class="m-info">
         <div class="m-title">${m.t}</div>
@@ -1062,7 +1065,7 @@ function renderDiario(){
       card.className = 'mural-card' + (isPerfect ? ' perfect-score' : '');
       card.innerHTML = `
         <div class="mural-poster"><div class="skeleton-poster"></div></div>
-        ${media!=null ? `<div class="mural-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? '⭐ ' : ''}${formatNum(media)}</div>` : ''}
+        ${media!=null ? `<div class="mural-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? iconHtml('star')+' ' : ''}${formatNum(media)}</div>` : ''}
         <div class="mural-overlay">${color ? `<span class="mural-dot" style="background:${color}"></span>` : ''}${escapeHtml(e.title)}</div>
       `;
       card.addEventListener('click', ()=> openDiarioModal(e));
@@ -1086,7 +1089,7 @@ function renderDiario(){
         <div class="m-title">${escapeHtml(e.title)}</div>
       </div>
       <div class="m-ratings">
-        ${media!=null ? `<span class="m-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? '⭐ ' : ''}${formatNum(media)}</span>` : ''}
+        ${media!=null ? `<span class="m-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? iconHtml('star')+' ' : ''}${formatNum(media)}</span>` : ''}
         <div class="m-rate-sub">
           ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
           ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
@@ -1689,7 +1692,7 @@ let wrCurrentPick = null;
 MOVIE_GENRES.forEach(g=>{
   const chip = document.createElement('div');
   chip.className = 'toggle-chip';
-  chip.textContent = g.emoji + ' ' + g.label;
+  chip.innerHTML = iconHtml(g.icon) + ' ' + escapeHtml(g.label);
   chip.dataset.genre = g.id;
   chip.addEventListener('click', ()=>{
     if(wrSelectedGenres.has(g.id)) wrSelectedGenres.delete(g.id);
@@ -1908,7 +1911,7 @@ function renderProfile(){
   animateNumberTo(document.getElementById('pTotal'), stats.total);
   document.getElementById('pAvg').textContent = formatNum(stats.avgCasal);
   const topGenre = stats.genreRanking[0];
-  document.getElementById('pTopGenre').textContent = topGenre ? (topGenre.genre.emoji + ' ' + topGenre.genre.label) : '—';
+  document.getElementById('pTopGenre').innerHTML = topGenre ? (iconHtml(topGenre.genre.icon) + ' ' + escapeHtml(topGenre.genre.label)) : '—';
   document.getElementById('pCritico').textContent = stats.critico;
 
   const topList = document.getElementById('profileTopList');
@@ -1926,7 +1929,7 @@ function renderProfile(){
         <div class="m-poster">${x.e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
         <div class="m-info"><div class="m-title">${escapeHtml(x.e.title)}</div></div>
         <div class="m-ratings">
-          <span class="m-media-badge${rowIsPerfect ? ' perfect' : ''}">${rowIsPerfect ? '⭐ ' : ''}${formatNum(x.media)}</span>
+          <span class="m-media-badge${rowIsPerfect ? ' perfect' : ''}">${rowIsPerfect ? iconHtml('star')+' ' : ''}${formatNum(x.media)}</span>
           <div class="m-rate-sub">
             ${x.e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(x.e.notaPaulo)}</span>` : ''}
             ${x.e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(x.e.notaJulia)}</span>` : ''}
@@ -1981,7 +1984,7 @@ function renderProfile(){
       row.className = 'genre-bar-row';
       row.style.animationDelay = (i*0.04)+'s';
       row.innerHTML = `
-        <div class="genre-bar-label">${g.genre.emoji} ${escapeHtml(g.genre.label)}</div>
+        <div class="genre-bar-label">${iconHtml(g.genre.icon)} ${escapeHtml(g.genre.label)}</div>
         <div class="genre-bar-track"><div class="genre-bar-fill" style="width:0%; background:${g.genre.color};"></div></div>
         <div class="genre-bar-count">${g.count}</div>
       `;
@@ -2037,7 +2040,7 @@ setActiveTab(activeTab);
 const cloudStatusEl = document.getElementById('cloudStatus');
 
 function setCloudStatus(text, cls){
-  cloudStatusEl.textContent = text;
+  cloudStatusEl.innerHTML = text;
   cloudStatusEl.classList.remove('cloud-on', 'cloud-off');
   if(cls) cloudStatusEl.classList.add(cls);
 }
@@ -2053,7 +2056,7 @@ function showCloudError(msg){
     el.className = 'cloud-toast';
     document.body.appendChild(el);
   }
-  el.textContent = '⚠️ ' + msg;
+  el.innerHTML = iconHtml('triangle-alert') + ' ' + escapeHtml(msg);
   el.classList.add('show');
   clearTimeout(cloudToastTimer);
   cloudToastTimer = setTimeout(()=> el.classList.remove('show'), 5000);
@@ -2074,7 +2077,7 @@ async function initCloudSync(){
   }catch(err){
     console.warn('Falha na autenticação com o Firebase, usando modo local.', err);
     cloudEnabled = false;
-    setCloudStatus('📴 Modo local (só neste aparelho)', 'cloud-off');
+    setCloudStatus(iconHtml('cloud-off') + ' Modo local (só neste aparelho)', 'cloud-off');
     return;
   }
 
@@ -2148,12 +2151,12 @@ async function initCloudSync(){
 
   cloudEnabled = successCount > 0;
   if(successCount === 3){
-    setCloudStatus('☁️ Sincronizado entre aparelhos', 'cloud-on');
+    setCloudStatus(iconHtml('cloud') + ' Sincronizado entre aparelhos', 'cloud-on');
   } else if(successCount > 0){
-    setCloudStatus('☁️ Sincronizado parcialmente — veja o console', 'cloud-off');
+    setCloudStatus(iconHtml('cloud') + ' Sincronizado parcialmente — veja o console', 'cloud-off');
     showCloudError('Uma parte não sincronizou com a nuvem — confira se as regras do Firestore foram publicadas.');
   } else {
-    setCloudStatus('📴 Modo local (só neste aparelho)', 'cloud-off');
+    setCloudStatus(iconHtml('cloud-off') + ' Modo local (só neste aparelho)', 'cloud-off');
   }
 }
 

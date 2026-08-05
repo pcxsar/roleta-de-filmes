@@ -19,6 +19,202 @@
 </head>
 <body>
 
+<svg style="display:none" aria-hidden="true">
+<defs>
+<symbol id="i-book-open" viewBox="0 0 24 24">
+  <path d="M12 5v16" />
+  <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" />
+</symbol>
+<symbol id="i-camera" viewBox="0 0 24 24">
+  <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" />
+  <circle cx="12" cy="13" r="3" />
+</symbol>
+<symbol id="i-check" viewBox="0 0 24 24">
+  <path d="M20 6 9 17l-5-5" />
+</symbol>
+<symbol id="i-clapperboard" viewBox="0 0 24 24">
+  <path d="m12.296 3.464 3.02 3.956" />
+  <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" />
+  <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  <path d="m6.18 5.276 3.1 3.899" />
+</symbol>
+<symbol id="i-cloud-off" viewBox="0 0 24 24">
+  <path d="M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057" />
+  <path d="M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78" />
+  <path d="m2 2 20 20" />
+</symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24">
+  <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+</symbol>
+<symbol id="i-compass" viewBox="0 0 24 24">
+  <circle cx="12" cy="12" r="10" />
+  <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" />
+</symbol>
+<symbol id="i-dices" viewBox="0 0 24 24">
+  <rect width="12" height="12" x="2" y="10" rx="2" ry="2" />
+  <path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" />
+  <path d="M6 18h.01" />
+  <path d="M10 14h.01" />
+  <path d="M15 6h.01" />
+  <path d="M18 9h.01" />
+</symbol>
+<symbol id="i-drama" viewBox="0 0 24 24">
+  <path d="M10 11h.01" />
+  <path d="M14 6h.01" />
+  <path d="M18 6h.01" />
+  <path d="M6.5 13.1h.01" />
+  <path d="M22 5c0 9-4 12-6 12s-6-3-6-12c0-2 2-3 6-3s6 1 6 3" />
+  <path d="M17.4 9.9c-.8.8-2 .8-2.8 0" />
+  <path d="M10.1 7.1C9 7.2 7.7 7.7 6 8.6c-3.5 2-4.7 3.9-3.7 5.6 4.5 7.8 9.5 8.4 11.2 7.4.9-.5 1.9-2.1 1.9-4.7" />
+  <path d="M9.1 16.5c.3-1.1 1.4-1.7 2.4-1.4" />
+</symbol>
+<symbol id="i-eye" viewBox="0 0 24 24">
+  <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+  <circle cx="12" cy="12" r="3" />
+</symbol>
+<symbol id="i-fingerprint" viewBox="0 0 24 24">
+  <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+  <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+  <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+  <path d="M2 12a10 10 0 0 1 18-6" />
+  <path d="M2 16h.01" />
+  <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+  <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+  <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+  <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+</symbol>
+<symbol id="i-ghost" viewBox="0 0 24 24">
+  <path d="M9 10h.01" />
+  <path d="M15 10h.01" />
+  <path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z" />
+</symbol>
+<symbol id="i-heart" viewBox="0 0 24 24">
+  <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" />
+</symbol>
+<symbol id="i-laugh" viewBox="0 0 24 24">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M18 13a6 6 0 0 1-6 5 6 6 0 0 1-6-5h12Z" />
+  <line x1="9" x2="9.01" y1="9" y2="9" />
+  <line x1="15" x2="15.01" y1="9" y2="9" />
+</symbol>
+<symbol id="i-layout-grid" viewBox="0 0 24 24">
+  <rect width="7" height="7" x="3" y="3" rx="1" />
+  <rect width="7" height="7" x="14" y="3" rx="1" />
+  <rect width="7" height="7" x="14" y="14" rx="1" />
+  <rect width="7" height="7" x="3" y="14" rx="1" />
+</symbol>
+<symbol id="i-list" viewBox="0 0 24 24">
+  <path d="M3 5h.01" />
+  <path d="M3 12h.01" />
+  <path d="M3 19h.01" />
+  <path d="M8 5h13" />
+  <path d="M8 12h13" />
+  <path d="M8 19h13" />
+</symbol>
+<symbol id="i-music" viewBox="0 0 24 24">
+  <path d="M9 18V5l12-2v13" />
+  <circle cx="6" cy="18" r="3" />
+  <circle cx="18" cy="16" r="3" />
+</symbol>
+<symbol id="i-notebook-pen" viewBox="0 0 24 24">
+  <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" />
+  <path d="M2 6h4" />
+  <path d="M2 10h4" />
+  <path d="M2 14h4" />
+  <path d="M2 18h4" />
+  <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />
+</symbol>
+<symbol id="i-palette" viewBox="0 0 24 24">
+  <path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" />
+  <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+  <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+  <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+  <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+</symbol>
+<symbol id="i-popcorn" viewBox="0 0 24 24">
+  <path d="M18 8a2 2 0 0 0 0-4 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0 0 4" />
+  <path d="M10 22 9 8" />
+  <path d="m14 22 1-14" />
+  <path d="M20 8c.5 0 .9.4.8 1l-2.6 12c-.1.5-.7 1-1.2 1H7c-.6 0-1.1-.4-1.2-1L3.2 9c-.1-.6.3-1 .8-1Z" />
+</symbol>
+<symbol id="i-rocket" viewBox="0 0 24 24">
+  <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+  <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" />
+  <path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" />
+  <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" />
+</symbol>
+<symbol id="i-scale" viewBox="0 0 24 24">
+  <path d="M12 3v18" />
+  <path d="m19 8 3 8a5 5 0 0 1-6 0zV7" />
+  <path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1" />
+  <path d="m5 8 3 8a5 5 0 0 1-6 0zV7" />
+  <path d="M7 21h10" />
+</symbol>
+<symbol id="i-shield" viewBox="0 0 24 24">
+  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+</symbol>
+<symbol id="i-sofa" viewBox="0 0 24 24">
+  <path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3" />
+  <path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z" />
+  <path d="M4 18v2" />
+  <path d="M20 18v2" />
+  <path d="M12 4v9" />
+</symbol>
+<symbol id="i-sparkles" viewBox="0 0 24 24">
+  <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+  <path d="M20 2v4" />
+  <path d="M22 4h-4" />
+  <circle cx="4" cy="20" r="2" />
+</symbol>
+<symbol id="i-star" viewBox="0 0 24 24">
+  <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
+</symbol>
+<symbol id="i-swords" viewBox="0 0 24 24">
+  <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" />
+  <line x1="13" x2="19" y1="19" y2="13" />
+  <line x1="16" x2="20" y1="16" y2="20" />
+  <line x1="19" x2="21" y1="21" y2="19" />
+  <polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" />
+  <line x1="5" x2="9" y1="14" y2="18" />
+  <line x1="7" x2="4" y1="17" y2="20" />
+  <line x1="3" x2="5" y1="19" y2="21" />
+</symbol>
+<symbol id="i-triangle-alert" viewBox="0 0 24 24">
+  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+  <path d="M12 9v4" />
+  <path d="M12 17h.01" />
+</symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24">
+  <path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" />
+  <path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" />
+  <path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" />
+  <path d="M4 22h16" />
+  <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" />
+  <path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" />
+</symbol>
+<symbol id="i-users" viewBox="0 0 24 24">
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+  <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+  <circle cx="9" cy="7" r="4" />
+</symbol>
+<symbol id="i-wand-2" viewBox="0 0 24 24">
+  <path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72" />
+  <path d="m14 7 3 3" />
+  <path d="M5 6v4" />
+  <path d="M19 14v4" />
+  <path d="M10 2v2" />
+  <path d="M7 8H3" />
+  <path d="M21 16h-4" />
+  <path d="M11 3H9" />
+</symbol>
+<symbol id="i-x" viewBox="0 0 24 24">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</symbol>
+</defs>
+</svg>
+
 <div class="splash-screen" id="splashScreen">
   <div class="splash-glow-bg"><span></span><span></span><span></span></div>
   <div class="splash-grain"></div>
@@ -48,10 +244,10 @@
   <h1><span class="hero-title-sub">Nosso registro</span><br>de filmes</h1>
 
   <div class="tabs" id="tabSwitcher">
-    <button class="tab-btn" data-tab="diario">📖 Diário</button>
-    <button class="tab-btn" data-tab="watchlist">🍿 Ver</button>
-    <button class="tab-btn" data-tab="roleta">🎰 Roleta</button>
-    <button class="tab-btn" data-tab="perfil">💑 Nós</button>
+    <button class="tab-btn" data-tab="diario"><svg class="icon"><use href="#i-notebook-pen"/></svg> Diário</button>
+    <button class="tab-btn" data-tab="watchlist"><svg class="icon"><use href="#i-popcorn"/></svg> Ver</button>
+    <button class="tab-btn" data-tab="roleta"><svg class="icon"><use href="#i-dices"/></svg> Roleta</button>
+    <button class="tab-btn" data-tab="perfil"><svg class="icon"><use href="#i-users"/></svg> Nós</button>
   </div>
   <!-- <div class="cloud-status" id="cloudStatus">Conectando…</div> -->
 </header>
@@ -81,8 +277,8 @@
         <h2>Filmes assistidos</h2>
         <div class="list-head-actions">
           <div class="view-toggle" id="diarioViewToggle">
-            <button class="view-toggle-btn active" data-view="list" aria-label="Ver como lista">☰</button>
-            <button class="view-toggle-btn" data-view="mural" aria-label="Ver como mural">▦</button>
+            <button class="view-toggle-btn active" data-view="list" aria-label="Ver como lista"><svg class="icon"><use href="#i-list"/></svg></button>
+            <button class="view-toggle-btn" data-view="mural" aria-label="Ver como mural"><svg class="icon"><use href="#i-layout-grid"/></svg></button>
           </div>
           <button class="add-btn" id="addMovieBtn">+ Novo filme</button>
         </div>
@@ -116,8 +312,8 @@
         <h2>Quero ver</h2>
         <div class="list-head-actions">
           <div class="view-toggle" id="watchlistViewToggle">
-            <button class="view-toggle-btn active" data-view="list" aria-label="Ver como lista">☰</button>
-            <button class="view-toggle-btn" data-view="mural" aria-label="Ver como mural">▦</button>
+            <button class="view-toggle-btn active" data-view="list" aria-label="Ver como lista"><svg class="icon"><use href="#i-list"/></svg></button>
+            <button class="view-toggle-btn" data-view="mural" aria-label="Ver como mural"><svg class="icon"><use href="#i-layout-grid"/></svg></button>
           </div>
           <button class="add-btn" id="addWatchlistBtn">+ Adicionar</button>
         </div>
@@ -133,8 +329,8 @@
 <!-- ==================== ABA: ROLETA DO OSCAR ==================== -->
 <section class="tab-panel" id="panel-roleta" hidden>
   <div class="tabs tabs-sub" id="rouletteModeSwitch">
-    <button class="mode-btn" data-mode="oscar">🎰 Oscar</button>
-    <button class="mode-btn" data-mode="watchlist">🍿 Nossa lista</button>
+    <button class="mode-btn" data-mode="oscar"><svg class="icon"><use href="#i-trophy"/></svg> Oscar</button>
+    <button class="mode-btn" data-mode="watchlist"><svg class="icon"><use href="#i-popcorn"/></svg> Nossa lista</button>
   </div>
 
   <div id="oscarRouletteMode">
@@ -175,7 +371,7 @@
           <input type="checkbox" id="onlyPendingToggle">
           Sortear só entre os pendentes
         </label>
-        <div class="pending-hint" id="pendingHint" style="display:none;">🎉 Vocês já viram tudo — sorteando entre todos de novo!</div>
+        <div class="pending-hint" id="pendingHint" style="display:none;"><svg class="icon"><use href="#i-sparkles"/></svg> Vocês já viram tudo — sorteando entre todos de novo!</div>
       </div>
     </div>
 
@@ -236,8 +432,8 @@
           <div class="r-title" id="wrTitle">Gire para descobrir o próximo filme</div>
           <div class="r-media" id="wrMedia"></div>
           <div class="r-actions" id="wrActions" style="display:none;">
-            <button class="r-btn mark-ok" id="wrMarkWatched">✓ Já assisti</button>
-            <button class="r-btn" id="wrSpinAgain">🎲 Girar de novo</button>
+            <button class="r-btn mark-ok" id="wrMarkWatched"><svg class="icon"><use href="#i-check"/></svg> Já assisti</button>
+            <button class="r-btn" id="wrSpinAgain"><svg class="icon"><use href="#i-dices"/></svg> Girar de novo</button>
           </div>
         </div>
       </div>
@@ -249,7 +445,7 @@
 <!-- ==================== ABA: NÓS (perfil do casal) ==================== -->
 <section class="tab-panel" id="panel-perfil" hidden>
   <div class="profile-intro">
-    <div class="profile-heart">💜</div>
+    <div class="profile-heart"><svg class="icon"><use href="#i-heart"/></svg></div>
     <p>O que a gente descobriu assistindo filme atrás de filme.</p>
   </div>
 
@@ -273,7 +469,7 @@
   </div>
 
   <div class="profile-section">
-    <h2 class="profile-section-title">🏆 Top 5 melhores filmes</h2>
+    <h2 class="profile-section-title"><svg class="icon"><use href="#i-trophy"/></svg> Top 5 melhores filmes</h2>
     <div class="profile-top-filter" id="profileTopFilter">
       <button class="mode-btn active" data-who="geral">Geral</button>
       <button class="mode-btn" data-who="paulo">Paulo</button>
@@ -283,12 +479,12 @@
   </div>
 
   <div class="profile-section">
-    <h2 class="profile-section-title">🤔 Onde mais discordamos</h2>
+    <h2 class="profile-section-title"><svg class="icon"><use href="#i-scale"/></svg> Onde mais discordamos</h2>
     <div id="profileClashList"></div>
   </div>
 
   <div class="profile-section" style="margin-bottom:60px;">
-    <h2 class="profile-section-title">🎬 Filmes por gênero</h2>
+    <h2 class="profile-section-title"><svg class="icon"><use href="#i-clapperboard"/></svg> Filmes por gênero</h2>
     <div id="profileGenreBars"></div>
   </div>
 </section>
@@ -298,14 +494,14 @@
 <!-- ==================== MODAL: adicionar/editar filme do Diário ==================== -->
 <div class="modal-overlay" id="diarioModalOverlay">
   <div class="modal-card">
-    <div class="modal-close" id="diarioModalClose">✕</div>
+    <div class="modal-close" id="diarioModalClose"><svg class="icon"><use href="#i-x"/></svg></div>
     <div class="modal-eyebrow" id="diarioModalEyebrow">Novo filme</div>
 
     <div class="poster-upload">
-      <div class="poster-upload-preview" id="diarioPosterPreview"><div class="r-poster-placeholder">🎬</div></div>
+      <div class="poster-upload-preview" id="diarioPosterPreview"><div class="r-poster-placeholder"><svg class="icon"><use href="#i-clapperboard"/></svg></div></div>
       <div class="poster-upload-actions">
         <label class="poster-upload-btn">
-          📷 Trocar capa
+          <svg class="icon"><use href="#i-camera"/></svg> Trocar capa
           <input type="file" accept="image/*" id="diarioPosterFile" hidden>
         </label>
         <button type="button" class="poster-upload-clear" id="diarioPosterClear" style="display:none;">remover capa enviada</button>
@@ -313,12 +509,12 @@
     </div>
 
     <input type="text" class="search diario-title-input" id="diarioTitleInput" placeholder="Nome do filme">
-    <div class="dup-warning" id="diarioDupWarning" style="display:none;">⚠️ Esse filme já está no seu Diário.</div>
+    <div class="dup-warning" id="diarioDupWarning" style="display:none;"><svg class="icon"><use href="#i-triangle-alert"/></svg> Esse filme já está no seu Diário.</div>
 
     <span class="field-label">Onde assistiram</span>
     <div class="chip-row" style="padding-top:0;">
-      <div class="toggle-chip" id="whereCinema">🎬 Cinema</div>
-      <div class="toggle-chip" id="whereCasa">🛋️ Casa</div>
+      <div class="toggle-chip" id="whereCinema"><svg class="icon"><use href="#i-clapperboard"/></svg> Cinema</div>
+      <div class="toggle-chip" id="whereCasa"><svg class="icon"><use href="#i-sofa"/></svg> Casa</div>
     </div>
 
     <span class="field-label">Categoria</span>
@@ -352,14 +548,14 @@
 <!-- ==================== MODAL: adicionar/editar item da watchlist ==================== -->
 <div class="modal-overlay" id="watchlistModalOverlay">
   <div class="modal-card">
-    <div class="modal-close" id="watchlistModalClose">✕</div>
+    <div class="modal-close" id="watchlistModalClose"><svg class="icon"><use href="#i-x"/></svg></div>
     <div class="modal-eyebrow" id="watchlistModalEyebrow">Novo filme pra ver</div>
 
     <div class="poster-upload">
-      <div class="poster-upload-preview" id="watchlistPosterPreview"><div class="r-poster-placeholder">🍿</div></div>
+      <div class="poster-upload-preview" id="watchlistPosterPreview"><div class="r-poster-placeholder"><svg class="icon"><use href="#i-popcorn"/></svg></div></div>
       <div class="poster-upload-actions">
         <label class="poster-upload-btn">
-          📷 Trocar capa
+          <svg class="icon"><use href="#i-camera"/></svg> Trocar capa
           <input type="file" accept="image/*" id="watchlistPosterFile" hidden>
         </label>
         <button type="button" class="poster-upload-clear" id="watchlistPosterClear" style="display:none;">remover capa enviada</button>
@@ -367,7 +563,7 @@
     </div>
 
     <input type="text" class="search diario-title-input" id="watchlistTitleInput" placeholder="Nome do filme">
-    <div class="dup-warning" id="watchlistDupWarning" style="display:none;">⚠️ Esse filme já está na sua lista.</div>
+    <div class="dup-warning" id="watchlistDupWarning" style="display:none;"><svg class="icon"><use href="#i-triangle-alert"/></svg> Esse filme já está na sua lista.</div>
 
     <span class="field-label">Categoria</span>
     <div id="watchlistGenreRow"></div>
@@ -377,13 +573,13 @@
 
     <div class="modal-actions">
       <button class="modal-save" id="watchlistModalSave">Salvar na lista</button>
-      <button class="modal-mark-watched" id="watchlistMarkWatched" style="display:none;">✓ Já assisti — mover pro Diário</button>
+      <button class="modal-mark-watched" id="watchlistMarkWatched" style="display:none;"><svg class="icon"><use href="#i-check"/></svg> Já assisti — mover pro Diário</button>
       <button class="modal-remove" id="watchlistModalRemove" style="display:none;">Remover da lista</button>
     </div>
   </div>
 </div>
 
-<button class="fab" id="fabSpin" aria-label="Girar a roleta">🎬</button>
+<button class="fab" id="fabSpin" aria-label="Girar a roleta"><svg class="icon"><use href="#i-dices"/></svg></button>
 
 <footer>
   Feito para Paulo &amp; Julia <span class="heart">♥</span> — filme por filme, sessão por sessão.
