@@ -479,7 +479,12 @@ async function fetchFromWiki(lang, title, year){
 }
 
 async function getMovieInfo(movie){
-  if(wikiCache[movie.id]) return wikiCache[movie.id];
+  // Só confia no cache quando ele já tem uma capa de verdade — uma busca
+  // que falhou ou não achou imagem não deve ficar presa em cache pra
+  // sempre, senão o filme nunca mais mostra capa depois de um primeiro
+  // tropeço (rede lenta, página errada casada na Wikipédia, etc).
+  const cached = wikiCache[movie.id];
+  if(cached && cached.image) return cached;
   const yearMatch = (movie.y || '').match(/\d{4}/);
   const searchYear = yearMatch ? yearMatch[0] : '';
   let info = null;
@@ -870,7 +875,13 @@ function renderGrid(){
     `;
     card.addEventListener('click', ()=> openRatingForOscarMovie(m.id));
     grid.appendChild(card);
-    lazyLoadPoster(card.querySelector('.m-poster'), m, 'm-poster-img');
+    const posterEl = card.querySelector('.m-poster');
+    const linkedEntry = diario.find(e => e.oscarId === m.id && e.poster);
+    if(linkedEntry){
+      posterEl.innerHTML = `<img class="m-poster-img" src="${linkedEntry.poster}" alt="${escapeHtml(m.t)}" loading="lazy">`;
+    } else {
+      lazyLoadPoster(posterEl, m, 'm-poster-img');
+    }
   });
 
   emptyState.style.display = shown===0 ? 'block' : 'none';
@@ -919,14 +930,25 @@ function renderMedia(movie){
   const wrap = document.getElementById('rMedia');
   wrap.innerHTML = skeletonHTML;
 
+  // Se já existe um registro no Diário pra esse filme com capa enviada
+  // à mão, ela sempre tem prioridade sobre a busca automática — assim a
+  // capa nunca some mesmo se a Wikipédia falhar.
+  const linkedEntry = diario.find(e => e.oscarId === movie.id && e.poster);
+  const customPoster = linkedEntry ? linkedEntry.poster : null;
+  const posterHtml = customPoster
+    ? `<img class="r-poster" src="${customPoster}" alt="${escapeHtml(movie.t)}" loading="lazy" onerror="handlePosterError(this)">`
+    : null;
+
   getMovieInfo(movie).then(info=>{
     if(!currentPick || currentPick.id !== movie.id) return;
 
+    const finalPosterHtml = posterHtml || ((info && info.found && info.image)
+      ? `<img class="r-poster" src="${info.image}" alt="${escapeHtml(movie.t)}" loading="lazy" onerror="handlePosterError(this)">`
+      : posterPlaceholderHTML);
+
     if(info && info.found){
       wrap.innerHTML = `
-        <div class="r-poster-wrap">
-          ${info.image ? `<img class="r-poster" src="${info.image}" alt="${escapeHtml(movie.t)}" loading="lazy" onerror="handlePosterError(this)">` : posterPlaceholderHTML}
-        </div>
+        <div class="r-poster-wrap">${finalPosterHtml}</div>
         <div class="r-synopsis">
           <p>${escapeHtml(truncate(info.extract, 340))}</p>
           <span class="r-wiki-credit">Sinopse via Wikipédia (${info.lang === 'pt' ? 'PT' : 'EN'})</span>
@@ -934,9 +956,9 @@ function renderMedia(movie){
     } else {
       const q = encodeURIComponent(movie.t + ' ' + movie.y + ' filme sinopse');
       wrap.innerHTML = `
-        <div class="r-poster-wrap">${posterPlaceholderHTML}</div>
+        <div class="r-poster-wrap">${finalPosterHtml}</div>
         <div class="r-synopsis">
-          <p class="r-no-info">Não encontramos a capa e a sinopse automaticamente dessa vez.</p>
+          <p class="r-no-info">Não encontramos a sinopse automaticamente dessa vez.</p>
           <a class="r-wiki-link" href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener">Buscar "${escapeHtml(movie.t)}"</a>
         </div>`;
     }
@@ -944,9 +966,9 @@ function renderMedia(movie){
     if(!currentPick || currentPick.id !== movie.id) return;
     const q = encodeURIComponent(movie.t + ' ' + movie.y + ' filme sinopse');
     wrap.innerHTML = `
-      <div class="r-poster-wrap">${posterPlaceholderHTML}</div>
+      <div class="r-poster-wrap">${posterHtml || posterPlaceholderHTML}</div>
       <div class="r-synopsis">
-        <p class="r-no-info">Sem conexão pra buscar a capa agora. Confira a lista de qualquer forma!</p>
+        <p class="r-no-info">Sem conexão pra buscar a sinopse agora. Confira a lista de qualquer forma!</p>
         <a class="r-wiki-link" href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener">Buscar "${escapeHtml(movie.t)}"</a>
       </div>`;
   });
