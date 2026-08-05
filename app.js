@@ -1938,13 +1938,30 @@ function showWatchlistResult(item){
   wrTitle.textContent = item.title;
   wrActions.style.display = 'flex';
 
-  const posterHtml = item.poster
-    ? `<div class="r-poster-wrap"><img class="r-poster" src="${item.poster}" alt="${escapeHtml(item.title)}"></div>`
-    : `<div class="r-poster-wrap">${posterPlaceholderHTML}</div>`;
   const descHtml = item.description
     ? `<p>${escapeHtml(item.description)}</p>`
     : `<p class="r-no-info">Sem descrição guardada pra esse aqui.</p>`;
-  wrMedia.innerHTML = `${posterHtml}<div class="r-synopsis">${descHtml}</div>`;
+
+  if(item.poster){
+    wrMedia.innerHTML = `<div class="r-poster-wrap"><img class="r-poster" src="${item.poster}" alt="${escapeHtml(item.title)}" onerror="handlePosterError(this)"></div><div class="r-synopsis">${descHtml}</div>`;
+  } else {
+    // Sem capa enviada à mão: tenta buscar uma automaticamente, igual já
+    // acontece na grade da watchlist — antes esse giro nunca tentava e só
+    // mostrava o placeholder direto.
+    wrMedia.innerHTML = `<div class="r-poster-wrap"><div class="skeleton-poster"></div></div><div class="r-synopsis">${descHtml}</div>`;
+    getMovieInfo({ id: item.id, t: item.title, y: '' }).then(info=>{
+      if(!wrCurrentPick || wrCurrentPick.id !== item.id) return;
+      const posterWrap = wrMedia.querySelector('.r-poster-wrap');
+      if(!posterWrap) return;
+      posterWrap.innerHTML = (info && info.found && info.image)
+        ? `<img class="r-poster" src="${info.image}" alt="${escapeHtml(item.title)}" loading="lazy" onerror="handlePosterError(this)">`
+        : posterPlaceholderHTML;
+    }).catch(()=>{
+      if(!wrCurrentPick || wrCurrentPick.id !== item.id) return;
+      const posterWrap = wrMedia.querySelector('.r-poster-wrap');
+      if(posterWrap) posterWrap.innerHTML = posterPlaceholderHTML;
+    });
+  }
 
   requestAnimationFrame(()=> wrResultCard.classList.add('show'));
 }
