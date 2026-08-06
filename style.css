@@ -797,6 +797,67 @@
   }
   .add-btn:hover{filter:brightness(1.08);}
   .add-btn:active{transform:scale(.96);}
+
+  /* ---------- Reorganizar por arraste (Diário/Watchlist) ---------- */
+  .reorder-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    padding:10px 15px;
+    border-radius:99px;
+    border:1px solid var(--line);
+    background:rgba(255,255,255,.03);
+    color:var(--text);
+    cursor:pointer;
+    white-space:nowrap;
+    transition:background 200ms var(--ease-out), border-color 200ms var(--ease-out), color 200ms var(--ease-out), transform 140ms var(--ease-out);
+  }
+  .reorder-btn:hover{border-color:var(--cyan);}
+  .reorder-btn:active{transform:scale(.96);}
+  .reorder-btn.active{
+    background:var(--cyan);
+    border-color:var(--cyan);
+    color:#04241a;
+    font-weight:700;
+  }
+  .reorder-hint{
+    display:none;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    color:var(--cyan);
+    background:rgba(47,230,209,.1);
+    border:1px solid rgba(47,230,209,.3);
+    border-radius:10px;
+    padding:9px 12px;
+    margin:10px 0;
+    line-height:1.5;
+  }
+  .reorder-hint.show{display:flex;}
+  .drag-handle{
+    display:flex; align-items:center; justify-content:center;
+    width:34px; height:34px; min-width:34px;
+    margin:-6px 0;
+    color:var(--muted);
+    cursor:grab;
+    touch-action:none;
+    border-radius:8px;
+    transition:background 160ms var(--ease-out), color 160ms var(--ease-out);
+  }
+  .drag-handle:hover{color:var(--text); background:rgba(255,255,255,.05);}
+  .movie-card.dragging{
+    position:relative;
+    cursor:grabbing;
+    z-index:40;
+    box-shadow:0 18px 36px -12px rgba(0,0,0,.7);
+    transition:none !important;
+    pointer-events:none;
+  }
+  .movie-card.reorder-item{cursor:default; position:relative;}
+  .movie-card.reorder-item.drop-before{box-shadow:0 -3px 0 0 var(--cyan);}
+  .movie-card.reorder-item.drop-after{box-shadow:0 3px 0 0 var(--cyan);}
+
   .search{
     width:100%;
     background:var(--panel);

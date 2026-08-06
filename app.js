@@ -459,6 +459,44 @@ function saveWikiCache(){
   try{ localStorage.setItem(WIKI_CACHE_KEY, JSON.stringify(wikiCache)); }catch(e){}
 }
 
+// Nomes de seção onde a Wikipédia costuma colocar o enredo de verdade
+// (o resumo da história), diferente do parágrafo de abertura do artigo
+// que só fala nacionalidade/direção/elenco/lançamento.
+const WIKI_PLOT_SECTION_NAMES = {
+  pt: /^(sinopse|enredo|trama|premissa)$/i,
+  en: /^(plot|synopsis|premise)$/i,
+};
+
+// Busca a seção de enredo/sinopse de uma página já resolvida e devolve
+// só o texto puro (sem links, notas de rodapé, links de "editar" etc).
+async function fetchWikiPlot(lang, pageTitle){
+  try{
+    const secUrl = `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&prop=sections&format=json&origin=*`;
+    const secRes = await fetch(secUrl);
+    if(!secRes.ok) return null;
+    const secJson = await secRes.json();
+    const sections = (secJson.parse && secJson.parse.sections) || [];
+    const pattern = WIKI_PLOT_SECTION_NAMES[lang] || WIKI_PLOT_SECTION_NAMES.en;
+    const match = sections.find(s => pattern.test((s.line || '').replace(/<[^>]+>/g, '').trim()));
+    if(!match) return null;
+
+    const textUrl = `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&section=${match.index}&prop=text&format=json&origin=*`;
+    const textRes = await fetch(textUrl);
+    if(!textRes.ok) return null;
+    const textJson = await textRes.json();
+    const html = textJson.parse && textJson.parse.text && textJson.parse.text['*'];
+    if(!html) return null;
+
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    div.querySelectorAll('.mw-editsection, .mw-heading, h2, h3, h4, table, sup, style, script').forEach(el => el.remove());
+    const plot = (div.textContent || '').replace(/\s+/g, ' ').trim();
+    return plot.length > 20 ? plot : null;
+  }catch(e){
+    return null;
+  }
+}
+
 async function fetchFromWiki(lang, title, year){
   const query = year ? `${title} ${year}` : title;
   const url = `https://${lang}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=1&prop=extracts%7Cpageimages&exintro=1&explaintext=1&exchars=500&piprop=original&format=json&origin=*`;
@@ -469,22 +507,27 @@ async function fetchFromWiki(lang, title, year){
   if(!pages) return null;
   const page = Object.values(pages)[0];
   if(!page || !page.extract || page.extract.length < 20) return null;
+
+  // O parágrafo de abertura (page.extract) só serve aqui pra confirmar que
+  // achamos a página certa — o que mostramos de fato é o enredo/sinopse.
+  const plot = await fetchWikiPlot(lang, page.title);
+
   return {
     found:true,
     title: page.title,
-    extract: page.extract,
+    extract: plot,
     image: page.original ? page.original.source : null,
     lang
   };
 }
 
 async function getMovieInfo(movie){
-  // Só confia no cache quando ele já tem uma capa de verdade — uma busca
-  // que falhou ou não achou imagem não deve ficar presa em cache pra
-  // sempre, senão o filme nunca mais mostra capa depois de um primeiro
-  // tropeço (rede lenta, página errada casada na Wikipédia, etc).
+  // Só confia no cache quando ele já tem capa E sinopse de verdade — uma
+  // busca que falhou ou não achou algum dos dois não deve ficar presa em
+  // cache pra sempre, senão o filme nunca mais mostra isso depois de um
+  // primeiro tropeço (rede lenta, página errada casada na Wikipédia, etc).
   const cached = wikiCache[movie.id];
-  if(cached && cached.image) return cached;
+  if(cached && cached.image && cached.extract) return cached;
   const yearMatch = (movie.y || '').match(/\d{4}/);
   const searchYear = yearMatch ? yearMatch[0] : '';
   let info = null;
@@ -946,7 +989,7 @@ function renderMedia(movie){
       ? `<img class="r-poster" src="${info.image}" alt="${escapeHtml(movie.t)}" loading="lazy" onerror="handlePosterError(this)">`
       : posterPlaceholderHTML);
 
-    if(info && info.found){
+    if(info && info.found && info.extract){
       wrap.innerHTML = `
         <div class="r-poster-wrap">${finalPosterHtml}</div>
         <div class="r-synopsis">
@@ -1045,8 +1088,113 @@ function sortDiario(list, mode){
     case 'oldest': arr.sort((a,b)=> a.addedAt - b.addedAt); break;
     case 'best': arr.sort((a,b)=> (computeMedia(b) === null ? -1 : computeMedia(b)) - (computeMedia(a) === null ? -1 : computeMedia(a))); break;
     case 'worst': arr.sort((a,b)=> (computeMedia(a) === null ? 11 : computeMedia(a)) - (computeMedia(b) === null ? 11 : computeMedia(b))); break;
+    case 'custom': arr.sort((a,b)=> (b.order ?? b.addedAt) - (a.order ?? a.addedAt)); break;
   }
   return arr;
+}
+
+/* =====================================================
+   Reordenar por arraste (usado no Diário e na Watchlist) —
+   segura a alça: o card acompanha o dedo/mouse (só visual, via
+   transform) enquanto arrasta, e a posição final só é decidida
+   e aplicada no DOM quando solta. Evita reordenar o DOM a cada
+   pixel durante o arraste, que é o que deixava tudo instável.
+===================================================== */
+function makeReorderable(gridEl, onDrop){
+  let dragEl = null;
+  let pointerId = null;
+  let startY = 0;
+  let lastPointerY = 0;
+  let scrollRAF = null;
+
+  function getCards(){
+    return [...gridEl.children].filter(c => c.classList.contains('movie-card'));
+  }
+
+  function clearDropHints(){
+    getCards().forEach(c => c.classList.remove('drop-before', 'drop-after'));
+  }
+
+  function findDropTarget(pointerY){
+    const cards = getCards().filter(c => c !== dragEl);
+    for(const c of cards){
+      const r = c.getBoundingClientRect();
+      if(pointerY < r.top + r.height/2) return { before: c };
+    }
+    return { after: cards[cards.length-1] || null };
+  }
+
+  function updateDragVisual(){
+    if(!dragEl) return;
+    dragEl.style.transform = `translateY(${lastPointerY - startY}px)`;
+    clearDropHints();
+    const target = findDropTarget(lastPointerY);
+    if(target.before) target.before.classList.add('drop-before');
+    else if(target.after) target.after.classList.add('drop-after');
+  }
+
+  // Enquanto arrasta perto do topo ou do rodapé da tela, rola a página
+  // sozinha — sem isso, dava pra reordenar só entre os filmes que já
+  // cabiam na tela, sem alcançar o resto da lista.
+  function autoScrollTick(){
+    if(!dragEl){ scrollRAF = null; return; }
+    const vh = window.innerHeight;
+    const margin = 100;
+    const maxSpeed = 16;
+    let speed = 0;
+    if(lastPointerY < margin){
+      speed = -maxSpeed * (1 - Math.max(0, lastPointerY)/margin);
+    } else if(lastPointerY > vh - margin){
+      speed = maxSpeed * (1 - Math.max(0, vh - lastPointerY)/margin);
+    }
+    if(speed !== 0){
+      window.scrollBy(0, speed);
+      updateDragVisual();
+    }
+    scrollRAF = requestAnimationFrame(autoScrollTick);
+  }
+
+  function onMove(e){
+    if(!dragEl) return;
+    lastPointerY = e.clientY;
+    updateDragVisual();
+  }
+
+  function onUp(e){
+    if(!dragEl) return;
+    try{ dragEl.releasePointerCapture(pointerId); }catch(err){}
+
+    const target = findDropTarget(e.clientY);
+    if(target.before) gridEl.insertBefore(dragEl, target.before);
+    else if(target.after) gridEl.insertBefore(dragEl, target.after.nextSibling);
+
+    clearDropHints();
+    dragEl.classList.remove('dragging');
+    dragEl.style.transform = '';
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    if(scrollRAF){ cancelAnimationFrame(scrollRAF); scrollRAF = null; }
+    const orderedIds = getCards().map(c => c.dataset.entryId);
+    dragEl = null;
+    onDrop(orderedIds);
+  }
+
+  gridEl.addEventListener('pointerdown', (e)=>{
+    const handle = e.target.closest('.drag-handle');
+    if(!handle) return;
+    const card = handle.closest('.movie-card');
+    if(!card) return;
+    e.preventDefault();
+    dragEl = card;
+    pointerId = e.pointerId;
+    try{ dragEl.setPointerCapture(pointerId); }catch(err){}
+    dragEl.classList.add('dragging');
+    startY = e.clientY;
+    lastPointerY = e.clientY;
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    scrollRAF = requestAnimationFrame(autoScrollTick);
+  });
 }
 
 /* =====================================================
@@ -1059,6 +1207,7 @@ let activeDiarioSort = 'recent';
 
 const DIARIO_VIEW_KEY = 'cinema-pj-diario-view';
 let diarioView = localStorage.getItem(DIARIO_VIEW_KEY) || 'list';
+let diarioReorderMode = false;
 
 function primaryGenreColor(e){
   const gs = entryGenres(e).map(genreById).filter(Boolean);
@@ -1066,6 +1215,42 @@ function primaryGenreColor(e){
 }
 
 function renderDiario(){
+  if(diarioReorderMode){
+    const sorted = sortDiario(diario, 'custom');
+    diarioGrid.className = 'movie-grid';
+    diarioGrid.innerHTML = '';
+    sorted.forEach(e=>{
+      const genresHtml = genreChipsHtml(entryGenres(e));
+      const media = computeMedia(e);
+      const color = primaryGenreColor(e);
+      const card = document.createElement('div');
+      card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '') + ' reorder-item';
+      card.dataset.entryId = e.id;
+      if(color) card.style.borderLeftColor = color;
+      card.innerHTML = `
+        <div class="drag-handle">${iconHtml('grip-vertical')}</div>
+        <div class="mc-main">
+        <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
+        <div class="m-info">
+          <div class="m-title">${escapeHtml(e.title)}</div>
+        </div>
+        <div class="m-ratings">
+          ${media!=null ? `<span class="m-media-badge">${formatNum(media)}</span>` : ''}
+        </div>
+        </div>
+      `;
+      diarioGrid.appendChild(card);
+      const posterEl = card.querySelector('.m-poster');
+      if(e.poster){
+        posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
+      } else {
+        lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+      }
+    });
+    diarioEmpty.style.display = sorted.length===0 ? 'block' : 'none';
+    return;
+  }
+
   const q = diarioSearch.value.trim().toLowerCase();
   const genreFilter = diarioGenreFilter.getValue();
   const filtered = diario
@@ -1132,6 +1317,40 @@ function renderDiario(){
 
   diarioEmpty.style.display = sorted.length===0 ? 'block' : 'none';
 }
+
+function finishDiarioReorder(orderedIds){
+  const base = Date.now();
+  orderedIds.forEach((id, idx)=>{
+    const entry = diario.find(x => x.id === id);
+    if(entry) entry.order = base - idx;
+  });
+  saveDiarioLocal();
+  if(cloudEnabled){
+    orderedIds.forEach(id=>{
+      const entry = diario.find(x => x.id === id);
+      if(entry) updateDoc(doc(diarioColRef, id), { order: entry.order }).catch(err => logCloudError('Falha ao sincronizar ordem do diário', err));
+    });
+  }
+  activeDiarioSort = 'custom';
+  document.querySelectorAll('#diarioSortRow .toggle-chip').forEach(c=> c.classList.toggle('active', c.dataset.sort === 'custom'));
+  renderDiario();
+}
+makeReorderable(diarioGrid, finishDiarioReorder);
+
+const diarioReorderBtn = document.getElementById('diarioReorderBtn');
+const diarioReorderHint = document.getElementById('diarioReorderHint');
+diarioReorderBtn.addEventListener('click', ()=>{
+  playClick();
+  diarioReorderMode = !diarioReorderMode;
+  diarioReorderBtn.classList.toggle('active', diarioReorderMode);
+  diarioReorderBtn.querySelector('span').textContent = diarioReorderMode ? 'Concluir' : 'Reorganizar';
+  diarioReorderHint.classList.toggle('show', diarioReorderMode);
+  diarioSearch.style.display = diarioReorderMode ? 'none' : '';
+  document.getElementById('diarioSortRow').style.display = diarioReorderMode ? 'none' : '';
+  document.getElementById('diarioGenreFilterRow').style.display = diarioReorderMode ? 'none' : '';
+  document.getElementById('diarioViewToggle').style.display = diarioReorderMode ? 'none' : '';
+  renderDiario();
+});
 
 const diarioViewToggle = document.getElementById('diarioViewToggle');
 function updateDiarioViewToggle(){
@@ -1447,6 +1666,7 @@ function findDuplicateWatchlist(title, excludeId){
 
 const WATCHLIST_VIEW_KEY = 'cinema-pj-watchlist-view';
 let watchlistView = localStorage.getItem(WATCHLIST_VIEW_KEY) || 'list';
+let watchlistReorderMode = false;
 
 const watchlistGrid = document.getElementById('watchlistGrid');
 const watchlistEmpty = document.getElementById('watchlistEmpty');
@@ -1482,11 +1702,42 @@ const watchlistGenreFilter = createGenreDropdown(watchlistGenreFilterRow, {
 });
 
 function renderWatchlist(){
+  if(watchlistReorderMode){
+    const sorted = [...watchlist].sort((a,b)=> (b.order ?? b.addedAt) - (a.order ?? a.addedAt));
+    watchlistGrid.className = 'movie-grid';
+    watchlistGrid.innerHTML = '';
+    sorted.forEach(e=>{
+      const genresHtml = genreChipsHtml(entryGenres(e));
+      const color = primaryGenreColor(e);
+      const card = document.createElement('div');
+      card.className = 'movie-card reorder-item';
+      card.dataset.entryId = e.id;
+      if(color) card.style.borderLeftColor = color;
+      card.innerHTML = `
+        <div class="drag-handle">${iconHtml('grip-vertical')}</div>
+        <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
+        <div class="m-info">
+          <div class="m-title">${escapeHtml(e.title)}</div>
+          ${genresHtml ? `<div class="m-genres-inline">${genresHtml}</div>` : ''}
+        </div>
+      `;
+      watchlistGrid.appendChild(card);
+      const posterEl = card.querySelector('.m-poster');
+      if(e.poster){
+        posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
+      } else {
+        lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+      }
+    });
+    watchlistEmpty.style.display = sorted.length===0 ? 'block' : 'none';
+    return;
+  }
+
   const q = watchlistSearch.value.trim().toLowerCase();
   const filtered = watchlist
     .filter(e => !q || e.title.toLowerCase().includes(q))
     .filter(e => { const g = watchlistGenreFilter.getValue(); return !g || entryGenres(e).includes(g); })
-    .sort((a,b) => b.addedAt - a.addedAt);
+    .sort((a,b) => (b.order ?? b.addedAt) - (a.order ?? a.addedAt));
   watchlistGrid.className = watchlistView === 'mural' ? 'diario-mural' : 'movie-grid';
   watchlistGrid.innerHTML = '';
 
@@ -1540,6 +1791,37 @@ function renderWatchlist(){
 function updateWatchlistStats(){
   document.getElementById('wTotal').textContent = watchlist.length;
 }
+
+function finishWatchlistReorder(orderedIds){
+  const base = Date.now();
+  orderedIds.forEach((id, idx)=>{
+    const entry = watchlist.find(x => x.id === id);
+    if(entry) entry.order = base - idx;
+  });
+  saveWatchlistLocal();
+  if(cloudEnabled){
+    orderedIds.forEach(id=>{
+      const entry = watchlist.find(x => x.id === id);
+      if(entry) updateDoc(doc(watchlistColRef, id), { order: entry.order }).catch(err => logCloudError('Falha ao sincronizar ordem da watchlist', err));
+    });
+  }
+  renderWatchlist();
+}
+makeReorderable(watchlistGrid, finishWatchlistReorder);
+
+const watchlistReorderBtn = document.getElementById('watchlistReorderBtn');
+const watchlistReorderHint = document.getElementById('watchlistReorderHint');
+watchlistReorderBtn.addEventListener('click', ()=>{
+  playClick();
+  watchlistReorderMode = !watchlistReorderMode;
+  watchlistReorderBtn.classList.toggle('active', watchlistReorderMode);
+  watchlistReorderBtn.querySelector('span').textContent = watchlistReorderMode ? 'Concluir' : 'Reorganizar';
+  watchlistReorderHint.classList.toggle('show', watchlistReorderMode);
+  watchlistSearch.style.display = watchlistReorderMode ? 'none' : '';
+  document.getElementById('watchlistGenreFilterRow').style.display = watchlistReorderMode ? 'none' : '';
+  document.getElementById('watchlistViewToggle').style.display = watchlistReorderMode ? 'none' : '';
+  renderWatchlist();
+});
 
 const watchlistViewToggle = document.getElementById('watchlistViewToggle');
 function updateWatchlistViewToggle(){
