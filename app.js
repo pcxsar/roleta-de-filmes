@@ -24,7 +24,11 @@ const db = getFirestore(fbApp);
 const roletaDocRef = doc(db, 'sync', 'roleta');
 const diarioColRef = collection(db, 'diario');
 const watchlistColRef = collection(db, 'watchlist');
+const favoritosColRef = collection(db, 'favoritos');
 let cloudEnabled = false;
+// Abrir com "?offline" na URL desliga a nuvem: útil pra testar mudanças
+// sem mexer nos dados de verdade (tudo fica só neste navegador).
+const OFFLINE_MODE = new URLSearchParams(location.search).has('offline');
 
 /* =====================================================
    DADOS — Vencedores do Oscar (para a Roleta)
@@ -165,6 +169,10 @@ function formatNum(n){
   const rounded = Math.round(n*100)/100;
   return String(rounded).replace('.', ',');
 }
+// Dados mínimos pra buscar capa/sinopse de um registro do Diário/Watchlist
+function lookupOf(e){
+  return { id: e.id, t: e.title, y: e.year || '', tmdbId: e.tmdbId || null };
+}
 function iconHtml(name, cls){
   return `<svg class="icon${cls ? ' '+cls : ''}"><use href="#i-${name}"/></svg>`;
 }
@@ -215,10 +223,13 @@ function genreChipsHtml(genreIds){
 // depender de scroll horizontal por gesto).
 function createGenreDropdown(mountEl, opts){
   const { allLabel, onSelect } = opts;
+  // Texto do botão quando nada está escolhido (pode ser mais curto que a
+  // opção "todos" do menu, pra caber na barra de filtros do celular).
+  const buttonLabel = opts.buttonLabel || allLabel;
   mountEl.innerHTML = `
     <div class="genre-dropdown">
       <button type="button" class="genre-dropdown-btn">
-        <span class="gd-label">${escapeHtml(allLabel)}</span>
+        <span class="gd-label">${escapeHtml(buttonLabel)}</span>
         <span class="gd-arrow">▾</span>
       </button>
       <div class="genre-dropdown-menu"></div>
@@ -244,7 +255,7 @@ function createGenreDropdown(mountEl, opts){
   function setValue(v){
     value = v || null;
     const g = genreById(value);
-    labelEl.innerHTML = g ? (iconHtml(g.icon) + ' ' + escapeHtml(g.label)) : escapeHtml(allLabel);
+    labelEl.innerHTML = g ? (iconHtml(g.icon) + ' ' + escapeHtml(g.label)) : (iconHtml('layout-grid') + ' ' + escapeHtml(buttonLabel));
     labelEl.style.color = g ? g.color : '';
     [...menu.children].forEach(opt=>{
       const active = (opt.dataset.genre || '') === (value || '');
@@ -351,6 +362,52 @@ function createGenreMultiPicker(mountEl, opts){
   return { setValues, getValues: ()=>values.slice(), close: ()=> root.classList.remove('open') };
 }
 
+// Dropdown simples de opções (ex: ordenação), com o mesmo visual do de
+// categoria — substitui fileiras de chips que ocupavam várias linhas.
+function createOptionDropdown(mountEl, opts){
+  const { options, icon, onSelect } = opts;
+  mountEl.innerHTML = `
+    <div class="genre-dropdown">
+      <button type="button" class="genre-dropdown-btn">
+        <span class="gd-label"></span>
+        <span class="gd-arrow">▾</span>
+      </button>
+      <div class="genre-dropdown-menu"></div>
+    </div>`;
+  const root = mountEl.querySelector('.genre-dropdown');
+  const btn = root.querySelector('.genre-dropdown-btn');
+  const labelEl = root.querySelector('.gd-label');
+  const menu = root.querySelector('.genre-dropdown-menu');
+  let value = opts.value || options[0].id;
+
+  options.forEach(o=>{
+    const opt = document.createElement('div');
+    opt.className = 'gd-option';
+    opt.dataset.value = o.id;
+    opt.textContent = o.label;
+    opt.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      setValue(o.id);
+      root.classList.remove('open');
+      if(onSelect) onSelect(value);
+    });
+    menu.appendChild(opt);
+  });
+  function setValue(v){
+    value = v;
+    const o = options.find(x => x.id === v) || options[0];
+    labelEl.innerHTML = (icon ? iconHtml(icon) + ' ' : '') + escapeHtml(o.label);
+    [...menu.children].forEach(el => el.classList.toggle('active', el.dataset.value === v));
+  }
+  btn.addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    document.querySelectorAll('.genre-dropdown.open').forEach(d=>{ if(d!==root) d.classList.remove('open'); });
+    root.classList.toggle('open');
+  });
+  setValue(value);
+  return { setValue, getValue: ()=>value };
+}
+
 document.addEventListener('click', ()=>{
   document.querySelectorAll('.genre-dropdown.open').forEach(d=> d.classList.remove('open'));
 });
@@ -449,6 +506,331 @@ function getRating(id, who){ return data[id] ? data[id][who] : null; }
 function watchedCount(){ return MOVIES.filter(m => isWatched(m.id)).length; }
 
 /* =====================================================
+   TMDB — busca de filmes, capas, sinopses e onde assistir.
+   A chave é colada pelo casal na tela de Configurações e fica
+   guardada na nuvem (config/app), fora do código público.
+   Aceita tanto a "Chave da API" (v3) quanto o "Token de
+   leitura" (v4, começa com eyJ). Sem chave, tudo continua
+   funcionando pela Wikipédia como antes.
+===================================================== */
+const TMDB_KEY_STORAGE = 'cinema-pj-tmdb-key';
+const TMDB_IMG = 'https://image.tmdb.org/t/p/';
+let tmdbKey = localStorage.getItem(TMDB_KEY_STORAGE) || '';
+const configDocRef = doc(db, 'config', 'app');
+
+function tmdbEnabled(){ return !!tmdbKey; }
+
+async function tmdbFetch(path, params, keyOverride){
+  const key = keyOverride || tmdbKey;
+  const url = new URL('https://api.themoviedb.org/3' + path);
+  Object.entries(params || {}).forEach(([k,v])=>{ if(v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
+  const headers = { accept: 'application/json' };
+  if(key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key;
+  else url.searchParams.set('api_key', key);
+  const res = await fetch(url, { headers });
+  if(!res.ok) throw new Error('TMDB ' + res.status);
+  return res.json();
+}
+
+function tmdbPoster(path, size){ return path ? TMDB_IMG + (size || 'w500') + path : null; }
+function tmdbYear(r){ return (r && r.release_date || '').slice(0,4); }
+
+// Gêneros do TMDB → categorias do app (os que não têm par ficam de fora)
+const TMDB_GENRE_MAP = {
+  28:'acao', 12:'aventura', 16:'animacao', 35:'comedia', 80:'crime',
+  99:'documentario', 18:'drama', 14:'fantasia', 27:'terror', 10402:'musical',
+  9648:'suspense', 53:'suspense', 10749:'romance', 878:'ficcao', 10752:'guerra',
+};
+function mapTmdbGenres(ids){
+  return [...new Set((ids || []).map(id => TMDB_GENRE_MAP[id]).filter(Boolean))];
+}
+
+async function tmdbSearch(query, year){
+  const params = { query, language:'pt-BR', region:'BR', include_adult:'false' };
+  let json = await tmdbFetch('/search/movie', year ? { ...params, year } : params);
+  if(year && !(json.results || []).length) json = await tmdbFetch('/search/movie', params);
+  return json.results || [];
+}
+
+// Onde assistir no Brasil (dados do JustWatch via TMDB). Guarda por 12h
+// pra não buscar de novo a cada abertura.
+const PROVIDERS_CACHE_KEY = 'cinema-pj-providers';
+const PROVIDERS_TTL = 12 * 3600 * 1000;
+let providersCache = {};
+try{ providersCache = JSON.parse(localStorage.getItem(PROVIDERS_CACHE_KEY) || '{}'); }catch(e){ providersCache = {}; }
+
+async function tmdbProviders(tmdbId){
+  const hit = providersCache[tmdbId];
+  if(hit && Date.now() - hit.at < PROVIDERS_TTL) return hit.data;
+  const json = await tmdbFetch(`/movie/${tmdbId}/watch/providers`);
+  const data = (json.results && json.results.BR) || null;
+  providersCache[tmdbId] = { at: Date.now(), data };
+  try{ localStorage.setItem(PROVIDERS_CACHE_KEY, JSON.stringify(providersCache)); }catch(e){}
+  return data;
+}
+
+// Descobre o id do TMDB de um filme (direto, se já tiver; senão pela busca
+// que também alimenta capa/sinopse) e desenha "onde assistir" no container.
+// wrapperEl (opcional) é o bloco inteiro que some quando não há o que mostrar.
+async function renderProviders(container, movieLike, wrapperEl){
+  const wrap = wrapperEl || container;
+  const show = (on)=>{ wrap.style.display = on ? '' : 'none'; };
+  if(!tmdbEnabled()){ container.innerHTML = ''; show(false); return; }
+  show(true);
+  container.innerHTML = '<div class="prov-loading"><div class="skeleton-line" style="width:60%"></div><div class="skeleton-line" style="width:40%"></div></div>';
+  const token = (container._provToken = {});
+  try{
+    let tmdbId = movieLike.tmdbId;
+    if(!tmdbId){
+      const info = await getMovieInfo(movieLike);
+      tmdbId = info && info.tmdbId;
+    }
+    if(container._provToken !== token) return;
+    if(!tmdbId){ container.innerHTML = ''; show(false); return; }
+    const data = await tmdbProviders(tmdbId);
+    if(container._provToken !== token) return;
+    container.innerHTML = providersHtml(data);
+  }catch(err){
+    if(container._provToken !== token) return;
+    container.innerHTML = '<p class="prov-empty">Não deu pra consultar onde assistir agora.</p>';
+  }
+}
+
+function providersHtml(data){
+  const groups = [
+    ['flatrate', 'No streaming'],
+    ['free', 'Grátis'],
+    ['ads', 'Grátis com anúncios'],
+    ['rent', 'Aluguel'],
+    ['buy', 'Compra'],
+  ];
+  const seen = new Set();
+  const rows = [];
+  groups.forEach(([key, label])=>{
+    const list = ((data && data[key]) || [])
+      .sort((a,b) => a.display_priority - b.display_priority)
+      .filter(p => { const k = key + p.provider_id; if(seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 6);
+    if(!list.length) return;
+    rows.push(`
+      <div class="prov-group">
+        <span class="prov-label">${label}</span>
+        <div class="prov-list">${list.map(p => `
+          <span class="prov-chip" title="${escapeHtml(p.provider_name)}">
+            <img src="${TMDB_IMG}w92${p.logo_path}" alt="" loading="lazy">${escapeHtml(p.provider_name)}
+          </span>`).join('')}
+        </div>
+      </div>`);
+  });
+  if(!rows.length){
+    return '<p class="prov-empty">Não está em nenhum streaming no Brasil agora.</p>';
+  }
+  const link = data && data.link ? `<a class="prov-link" href="${data.link}" target="_blank" rel="noopener">Ver links ↗</a>` : '';
+  return rows.join('') + `<div class="prov-credit">Dados do JustWatch ${link}</div>`;
+}
+
+/* =====================================================
+   Cor da capa — tira a cor mais marcante do pôster pra tingir
+   a tela do filme e o resultado da roleta. Se a imagem não
+   deixar ler os pixels (CORS) ou for quase cinza, fica o
+   visual padrão.
+===================================================== */
+const posterColorCache = new Map();
+
+function posterColor(src){
+  if(!src) return Promise.resolve(null);
+  if(posterColorCache.has(src)) return posterColorCache.get(src);
+  const job = new Promise((resolve)=>{
+    const img = new Image();
+    if(!src.startsWith('data:')) img.crossOrigin = 'anonymous';
+    img.onload = ()=>{
+      try{
+        const w = 24, h = 36;
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, w, h);
+        const px = ctx.getImageData(0, 0, w, h).data;
+        // Agrupa por faixa de matiz e pontua por saturação (cores vivas e
+        // nem muito escuras nem muito claras pesam mais)
+        const buckets = new Map();
+        for(let i = 0; i < px.length; i += 4){
+          const [hh, s, l] = rgbToHsl(px[i], px[i+1], px[i+2]);
+          if(l < .12 || l > .9 || s < .18) continue;
+          const score = s * (1 - Math.abs(l - .5) * 1.4);
+          const key = Math.round(hh * 18) % 18;
+          const b = buckets.get(key) || { score:0, r:0, g:0, b:0 };
+          b.score += score; b.r += px[i]*score; b.g += px[i+1]*score; b.b += px[i+2]*score;
+          buckets.set(key, b);
+        }
+        let best = null;
+        buckets.forEach(b => { if(!best || b.score > best.score) best = b; });
+        if(!best || best.score < 1.5){ resolve(null); return; }
+        const [hh, s] = rgbToHsl(best.r/best.score, best.g/best.score, best.b/best.score);
+        const hue = Math.round(hh * 360);
+        const sat = Math.round(Math.min(.9, Math.max(.5, s)) * 100);
+        resolve({
+          accent: `hsl(${hue} ${sat}% 66%)`,
+          deep: `hsl(${hue} ${Math.round(sat*.75)}% 17%)`,
+          glow: `hsl(${hue} ${sat}% 55% / .45)`,
+        });
+      }catch(e){ resolve(null); } // imagem sem permissão de leitura
+    };
+    img.onerror = ()=> resolve(null);
+    img.src = src;
+  });
+  posterColorCache.set(src, job);
+  return job;
+}
+
+function rgbToHsl(r, g, b){
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if(max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > .5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if(max === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if(max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return [h / 6, s, l];
+}
+
+// Pinta um elemento com a cor da capa (variáveis --tint, --tint-deep, --tint-glow)
+function applyTint(el, src){
+  if(!el) return;
+  const token = (el._tintToken = {});
+  if(!src){ clearTint(el); return; }
+  posterColor(src).then(c=>{
+    if(el._tintToken !== token) return;
+    if(!c){ clearTint(el); return; }
+    el.style.setProperty('--tint', c.accent);
+    el.style.setProperty('--tint-deep', c.deep);
+    el.style.setProperty('--tint-glow', c.glow);
+    el.classList.add('tinted');
+  });
+}
+function clearTint(el){
+  el.classList.remove('tinted');
+  el.style.removeProperty('--tint');
+  el.style.removeProperty('--tint-deep');
+  el.style.removeProperty('--tint-glow');
+}
+
+/* =====================================================
+   Sugestões enquanto digita o nome do filme: filmes que já
+   estão no Diário (quando faz sentido) + resultados do TMDB,
+   com capa e ano pra não ter dúvida de qual é qual.
+===================================================== */
+function attachMovieSuggest(inputEl, listEl, opts){
+  const { localItems, onPickLocal, onPickTmdb, onInput } = opts;
+  let timer = null;
+  let seq = 0;
+
+  function hide(){
+    clearTimeout(timer);
+    seq++;
+    listEl.innerHTML = '';
+    listEl.classList.remove('open');
+  }
+
+  function addHeader(text){
+    const h = document.createElement('div');
+    h.className = 'suggest-head';
+    h.textContent = text;
+    listEl.appendChild(h);
+  }
+  function addItem({ thumb, title, sub, badge, onPick }){
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'suggest-item';
+    item.innerHTML = `
+      <span class="suggest-thumb">${thumb ? `<img src="${thumb}" alt="" loading="lazy" onerror="this.remove()">` : iconHtml('clapperboard')}</span>
+      <span class="suggest-text">
+        <span class="suggest-title">${escapeHtml(title)}</span>
+        ${sub ? `<span class="suggest-sub">${escapeHtml(sub)}</span>` : ''}
+      </span>
+      ${badge ? `<span class="suggest-media">${badge}</span>` : ''}`;
+    item.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      hide();
+      onPick();
+    });
+    listEl.appendChild(item);
+  }
+
+  function render(locals, results, loading){
+    listEl.innerHTML = '';
+    if(locals.length){
+      addHeader('No nosso diário');
+      locals.forEach(e => addItem({
+        thumb: e.poster || null,
+        title: e.title,
+        sub: e.year || '',
+        badge: computeMedia(e) != null ? formatNum(computeMedia(e)) : '',
+        onPick: ()=> onPickLocal(e),
+      }));
+    }
+    if(results.length){
+      addHeader('Do TMDB');
+      results.forEach(r => {
+        const year = tmdbYear(r);
+        const original = r.original_title && r.original_title !== r.title ? r.original_title : '';
+        addItem({
+          thumb: tmdbPoster(r.poster_path, 'w92'),
+          title: r.title,
+          sub: [year, original].filter(Boolean).join(' · '),
+          onPick: ()=> onPickTmdb(r),
+        });
+      });
+    }
+    if(loading){
+      const l = document.createElement('div');
+      l.className = 'suggest-loading';
+      l.textContent = 'Buscando no TMDB…';
+      listEl.appendChild(l);
+    }
+    listEl.classList.toggle('open', listEl.children.length > 0);
+  }
+
+  function update(){
+    const raw = inputEl.value.trim();
+    const q = normalizeTitle(raw);
+    const locals = (localItems && q) ? localItems(q) : [];
+    clearTimeout(timer);
+    const my = ++seq;
+    if(!tmdbEnabled() || raw.length < 2){ render(locals, [], false); return; }
+    render(locals, [], true);
+    timer = setTimeout(async ()=>{
+      try{
+        const results = (await tmdbSearch(raw)).slice(0, 6);
+        if(my === seq) render(locals, results, false);
+      }catch(e){
+        if(my === seq) render(locals, [], false);
+      }
+    }, 320);
+  }
+
+  inputEl.addEventListener('input', ()=>{
+    if(onInput) onInput();
+    update();
+  });
+  const overlay = inputEl.closest('.modal-overlay');
+  if(overlay) overlay.addEventListener('click', (e)=>{ if(!e.target.closest('.suggest-wrap')) hide(); });
+  return { hide };
+}
+
+// Texto de ajuda embaixo do nome do filme nos formulários
+function updateTmdbHints(){
+  document.querySelectorAll('.tmdb-hint').forEach(el=>{
+    el.innerHTML = tmdbEnabled()
+      ? 'Digite e escolha uma sugestão pra puxar capa, ano e sinopse.'
+      : 'Quer sugestões com capa automática? <button type="button" class="link-btn" data-open-settings>Ative o TMDB</button>.';
+  });
+}
+
+/* =====================================================
    Cache de capas/sinopses via Wikipédia (compartilhado
    pela Roleta e pelo Diário)
 ===================================================== */
@@ -527,9 +909,40 @@ async function getMovieInfo(movie){
   // cache pra sempre, senão o filme nunca mais mostra isso depois de um
   // primeiro tropeço (rede lenta, página errada casada na Wikipédia, etc).
   const cached = wikiCache[movie.id];
-  if(cached && cached.image && cached.extract) return cached;
-  const yearMatch = (movie.y || '').match(/\d{4}/);
+  const yearMatch = String(movie.y || '').match(/\d{4}/);
   const searchYear = yearMatch ? yearMatch[0] : '';
+
+  // Com o TMDB ativado ele tem prioridade (capa oficial, sinopse em PT e o
+  // id pra "onde assistir"). Resultados antigos da Wikipédia no cache são
+  // trocados na primeira vez que o filme aparece.
+  if(tmdbEnabled()){
+    if(cached && cached.source === 'tmdb' && (!movie.tmdbId || cached.tmdbId === movie.tmdbId)) return cached;
+    try{
+      let r = null;
+      if(movie.tmdbId){
+        r = await tmdbFetch(`/movie/${movie.tmdbId}`, { language:'pt-BR' });
+      } else {
+        r = (await tmdbSearch(movie.t, searchYear))[0] || null;
+      }
+      if(r){
+        const info = {
+          found: true,
+          source: 'tmdb',
+          title: r.title,
+          extract: r.overview || null,
+          image: tmdbPoster(r.poster_path),
+          tmdbId: r.id,
+          year: tmdbYear(r),
+          lang: 'tmdb',
+        };
+        wikiCache[movie.id] = info;
+        saveWikiCache();
+        return info;
+      }
+    }catch(e){ /* cai pra Wikipédia */ }
+  }
+
+  if(cached && cached.image && cached.extract) return cached;
   let info = null;
   try{ info = await fetchFromWiki('pt', movie.t, searchYear); }catch(e){ info = null; }
   if(!info){
@@ -658,29 +1071,7 @@ function flareBurst(originEl){
   setTimeout(()=> el.remove(), 700);
 }
 
-// Partículas saindo da foto do casal no topo (decorativo)
-(function initHeroParticles(){
-  const container = document.getElementById('heroParticles');
-  if(!container) return;
-  const colors = ['#ffcc4d', '#ff3fb0', '#2fe6d1', '#8b5cf6'];
-  for(let i=0;i<10;i++){
-    const p = document.createElement('div');
-    p.className = 'hero-particle';
-    const angle = Math.random()*Math.PI*2;
-    const dist = 34 + Math.random()*46;
-    p.style.left = (50 + Math.cos(angle)*18) + '%';
-    p.style.top = (50 + Math.sin(angle)*18) + '%';
-    p.style.setProperty('--px', Math.cos(angle)*dist + 'px');
-    p.style.setProperty('--py', Math.sin(angle)*dist + 'px');
-    p.style.color = colors[i % colors.length];
-    p.style.background = colors[i % colors.length];
-    p.style.animationDelay = (Math.random()*3) + 's';
-    p.style.animationDuration = (2.4 + Math.random()*1.8) + 's';
-    container.appendChild(p);
-  }
-})();
-
-// Partículas da tela de abertura (mesmo visual das da foto no topo)
+// Partículas da tela de abertura
 (function initSplashParticles(){
   const container = document.getElementById('splashParticles');
   if(!container) return;
@@ -729,23 +1120,6 @@ function flareBurst(originEl){
   }
 })();
 
-// Partículas ambiente sutis no fundo (decorativo, não interativo)
-(function initSparkles(){
-  const container = document.getElementById('sparkles');
-  const colors = ['#ffcc4d', '#ff3fb0', '#2fe6d1', '#8b5cf6'];
-  for(let i=0;i<14;i++){
-    const s = document.createElement('div');
-    s.className = 'sparkle';
-    s.style.left = Math.random()*100 + '%';
-    s.style.top = Math.random()*100 + '%';
-    s.style.color = colors[i % colors.length];
-    s.style.background = colors[i % colors.length];
-    s.style.animationDelay = (Math.random()*4) + 's';
-    s.style.animationDuration = (3 + Math.random()*3) + 's';
-    container.appendChild(s);
-  }
-})();
-
 /* =====================================================
    Lógica de giro
 ===================================================== */
@@ -772,10 +1146,12 @@ function spin(){
   wheelHalo.classList.add('spinning');
   scheduleTicks(4600);
 
-  const pending = MOVIES.filter(m => !isWatched(m.id));
+  const notVetoed = m => !isVetoed('o:' + m.id);
+  const pending = MOVIES.filter(m => !isWatched(m.id) && notVetoed(m));
   const usePending = onlyPendingToggle.checked && pending.length > 0;
   pendingHint.style.display = (onlyPendingToggle.checked && pending.length === 0) ? 'block' : 'none';
-  const pool = usePending ? pending : MOVIES;
+  const allowed = MOVIES.filter(notVetoed);
+  const pool = usePending ? pending : (allowed.length ? allowed : MOVIES);
   const picked = pool[Math.floor(Math.random()*pool.length)];
   const targetIndex = MOVIES.findIndex(m => m.id === picked.id);
 
@@ -823,6 +1199,7 @@ function showResult(idx, opts){
   rMark.textContent = done ? 'Editar avaliação' : 'Marcar como assistido';
   requestAnimationFrame(()=> resultCard.classList.add('show'));
   if(withMedia) renderMedia(m);
+  renderVetoUi();
 }
 
 spinBtn.addEventListener('click', spin);
@@ -836,16 +1213,23 @@ rMark.addEventListener('click', ()=>{
    FAB flutuante (mobile): rola pro topo e gira de novo
 ===================================================== */
 const fabSpin = document.getElementById('fabSpin');
-const stageEl = document.querySelector('.stage');
+// Roleta visível agora (Oscar ou "Nossa lista") — o botão gira a que está na tela
+function activeWheelArea(){
+  return document.querySelector(rouletteMode === 'watchlist' ? '#slotMachine' : '#oscarRouletteMode .wheel-area');
+}
 window.addEventListener('scroll', ()=>{
-  if(activeTab !== 'roleta'){ fabSpin.classList.remove('visible'); return; }
-  const trigger = stageEl.offsetTop + stageEl.offsetHeight;
-  fabSpin.classList.toggle('visible', window.scrollY > trigger);
+  const wheel = activeTab === 'roleta' ? activeWheelArea() : null;
+  if(!wheel || !wheel.offsetParent){ fabSpin.classList.remove('visible'); return; }
+  fabSpin.classList.toggle('visible', wheel.getBoundingClientRect().bottom < 0);
 }, {passive:true});
 fabSpin.addEventListener('click', ()=>{
   playClick();
-  window.scrollTo({top:0, behavior:'smooth'});
-  setTimeout(()=>{ if(!spinning) spin(); }, 450);
+  const wheel = activeWheelArea();
+  window.scrollTo({ top: Math.max(0, wheel.getBoundingClientRect().top + window.scrollY - 90), behavior:'smooth' });
+  setTimeout(()=>{
+    if(rouletteMode === 'watchlist') spinWatchlistWheel();
+    else if(!spinning) spin();
+  }, 450);
 });
 
 /* =====================================================
@@ -906,17 +1290,15 @@ function renderGrid(){
 
     const card = document.createElement('div');
     card.className = 'movie-card' + (done ? ' done' : '');
-    card.style.borderLeftColor = DECADE_COLORS[decadeOf(m)];
     card.innerHTML = `
       <div class="m-poster"><div class="skeleton-poster"></div></div>
-      <div class="m-check">${done ? iconHtml('check') : ''}</div>
-      <div class="m-year">${m.y}</div>
       <div class="m-info">
-        <div class="m-title">${m.t}</div>
+        <div class="m-title">${escapeHtml(m.t)}</div>
+        <div class="m-sub"><span class="m-year" style="color:${DECADE_COLORS[decadeOf(m)]}">${m.y}</span>${done ? `<span class="m-done-tag">${iconHtml('check')} visto</span>` : ''}</div>
       </div>
       ${chips}
     `;
-    card.addEventListener('click', ()=> openRatingForOscarMovie(m.id));
+    card.addEventListener('click', ()=> openRatingForOscarMovie(m.id, card));
     grid.appendChild(card);
     const posterEl = card.querySelector('.m-poster');
     const linkedEntry = diario.find(e => e.oscarId === m.id && e.poster);
@@ -936,6 +1318,7 @@ function updateProgress(){
   document.getElementById('prog-total-num').textContent = N;
   const pct = (count / N) * 100;
   document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-pct').textContent = Math.round(pct) + '%';
 }
 
 /* =====================================================
@@ -944,11 +1327,11 @@ function updateProgress(){
    Se já existe um registro do Diário ligado a esse filme, edita
    ele; senão cria um novo já com título e capa preenchidos.
 ===================================================== */
-function openRatingForOscarMovie(movieId){
+function openRatingForOscarMovie(movieId, originEl){
   const movie = ALL_OSCAR_WINNERS[movieId];
   const existingEntry = diario.find(e => e.oscarId === movieId);
   if(existingEntry){
-    openMovieView(existingEntry, 'diario');
+    openMovieView(existingEntry, 'diario', originEl);
   } else {
     const existingRating = data[movieId] || {};
     openDiarioModal(null, {
@@ -972,6 +1355,7 @@ const skeletonHTML = `
 function renderMedia(movie){
   const wrap = document.getElementById('rMedia');
   wrap.innerHTML = skeletonHTML;
+  renderProviders(document.getElementById('rProviders'), movie);
 
   // Se já existe um registro no Diário pra esse filme com capa enviada
   // à mão, ela sempre tem prioridade sobre a busca automática — assim a
@@ -982,8 +1366,10 @@ function renderMedia(movie){
     ? `<img class="r-poster" src="${customPoster}" alt="${escapeHtml(movie.t)}" loading="lazy" onerror="handlePosterError(this)">`
     : null;
 
+  applyTint(resultCard, customPoster);
   getMovieInfo(movie).then(info=>{
     if(!currentPick || currentPick.id !== movie.id) return;
+    applyTint(resultCard, customPoster || (info && info.found ? info.image : null));
 
     const finalPosterHtml = posterHtml || ((info && info.found && info.image)
       ? `<img class="r-poster" src="${info.image}" alt="${escapeHtml(movie.t)}" loading="lazy" onerror="handlePosterError(this)">`
@@ -994,7 +1380,7 @@ function renderMedia(movie){
         <div class="r-poster-wrap">${finalPosterHtml}</div>
         <div class="r-synopsis">
           <p>${escapeHtml(truncate(info.extract, 340))}</p>
-          <span class="r-wiki-credit">Sinopse via Wikipédia (${info.lang === 'pt' ? 'PT' : 'EN'})</span>
+          <span class="r-wiki-credit">${info.source === 'tmdb' ? 'Sinopse via TMDB' : `Sinopse via Wikipédia (${info.lang === 'pt' ? 'PT' : 'EN'})`}</span>
         </div>`;
     } else {
       const q = encodeURIComponent(movie.t + ' ' + movie.y + ' filme sinopse');
@@ -1220,16 +1606,12 @@ function renderDiario(){
     diarioGrid.className = 'movie-grid';
     diarioGrid.innerHTML = '';
     sorted.forEach(e=>{
-      const genresHtml = genreChipsHtml(entryGenres(e));
       const media = computeMedia(e);
-      const color = primaryGenreColor(e);
       const card = document.createElement('div');
-      card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '') + ' reorder-item';
+      card.className = 'movie-card reorder-item';
       card.dataset.entryId = e.id;
-      if(color) card.style.borderLeftColor = color;
       card.innerHTML = `
         <div class="drag-handle">${iconHtml('grip-vertical')}</div>
-        <div class="mc-main">
         <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
         <div class="m-info">
           <div class="m-title">${escapeHtml(e.title)}</div>
@@ -1237,14 +1619,13 @@ function renderDiario(){
         <div class="m-ratings">
           ${media!=null ? `<span class="m-media-badge">${formatNum(media)}</span>` : ''}
         </div>
-        </div>
       `;
       diarioGrid.appendChild(card);
       const posterEl = card.querySelector('.m-poster');
       if(e.poster){
         posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
       } else {
-        lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+        lazyLoadPoster(posterEl, lookupOf(e), 'm-poster-img');
       }
     });
     diarioEmpty.style.display = sorted.length===0 ? 'block' : 'none';
@@ -1275,43 +1656,40 @@ function renderDiario(){
         ${media!=null ? `<div class="mural-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? iconHtml('star')+' ' : ''}${formatNum(media)}</div>` : ''}
         <div class="mural-overlay">${color ? `<span class="mural-dot" style="background:${color}"></span>` : ''}${escapeHtml(e.title)}</div>
       `;
-      card.addEventListener('click', ()=> openMovieView(e, 'diario'));
+      card.addEventListener('click', ()=> openMovieView(e, 'diario', card));
       diarioGrid.appendChild(card);
       const muralPosterEl = card.querySelector('.mural-poster');
       if(e.poster){
         muralPosterEl.innerHTML = `<img src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
       } else {
-        lazyLoadPoster(muralPosterEl, {id:e.id, t:e.title, y:''}, '');
+        lazyLoadPoster(muralPosterEl, lookupOf(e), '');
       }
       return;
     }
 
-    card.className = 'movie-card' + (genresHtml ? ' mc-stacked' : '') + (isPerfect ? ' perfect-score' : '');
-    if(color) card.style.borderLeftColor = color;
-    if(isPerfect) card.style.borderLeftColor = '';
+    card.className = 'movie-card' + (isPerfect ? ' perfect-score' : '');
+    const whereHtml = e.where ? `<span class="m-where" title="${escapeHtml(e.where)}">${iconHtml(e.where === 'Cinema' ? 'clapperboard' : 'sofa')}</span>` : '';
     card.innerHTML = `
-      <div class="mc-main">
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
+        ${(whereHtml || genresHtml) ? `<div class="m-sub">${whereHtml}${genresHtml}</div>` : ''}
       </div>
       <div class="m-ratings">
-        ${media!=null ? `<span class="m-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? iconHtml('star')+' ' : ''}${formatNum(media)}</span>` : ''}
+        ${media!=null ? `<span class="m-media-badge${isPerfect ? ' perfect' : ''}">${isPerfect ? iconHtml('star')+' ' : ''}${formatNum(media)}</span>` : '<span class="m-media-badge empty">—</span>'}
         <div class="m-rate-sub">
           ${e.notaPaulo!=null ? `<span class="m-rate-chip p">P ${formatNum(e.notaPaulo)}</span>` : ''}
           ${e.notaJulia!=null ? `<span class="m-rate-chip j">J ${formatNum(e.notaJulia)}</span>` : ''}
         </div>
       </div>
-      </div>
-      ${genresHtml ? `<div class="mc-genres">${genresHtml}</div>` : ''}
     `;
-    card.addEventListener('click', ()=> openMovieView(e, 'diario'));
+    card.addEventListener('click', ()=> openMovieView(e, 'diario', card));
     diarioGrid.appendChild(card);
     const posterEl = card.querySelector('.m-poster');
     if(e.poster){
       posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
     } else {
-      lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+      lazyLoadPoster(posterEl, lookupOf(e), 'm-poster-img');
     }
   });
 
@@ -1332,7 +1710,7 @@ function finishDiarioReorder(orderedIds){
     });
   }
   activeDiarioSort = 'custom';
-  document.querySelectorAll('#diarioSortRow .toggle-chip').forEach(c=> c.classList.toggle('active', c.dataset.sort === 'custom'));
+  diarioSortDropdown.setValue('custom');
   renderDiario();
 }
 makeReorderable(diarioGrid, finishDiarioReorder);
@@ -1343,11 +1721,10 @@ diarioReorderBtn.addEventListener('click', ()=>{
   playClick();
   diarioReorderMode = !diarioReorderMode;
   diarioReorderBtn.classList.toggle('active', diarioReorderMode);
-  diarioReorderBtn.querySelector('span').textContent = diarioReorderMode ? 'Concluir' : 'Reorganizar';
+  diarioReorderBtn.querySelector('span').textContent = diarioReorderMode ? 'Concluir' : 'Ordem';
   diarioReorderHint.classList.toggle('show', diarioReorderMode);
-  diarioSearch.style.display = diarioReorderMode ? 'none' : '';
-  document.getElementById('diarioSortRow').style.display = diarioReorderMode ? 'none' : '';
-  document.getElementById('diarioGenreFilterRow').style.display = diarioReorderMode ? 'none' : '';
+  document.getElementById('diarioSearchWrap').style.display = diarioReorderMode ? 'none' : '';
+  document.querySelector('#panel-diario .toolbar-filters').style.visibility = diarioReorderMode ? 'hidden' : '';
   document.getElementById('diarioViewToggle').style.display = diarioReorderMode ? 'none' : '';
   renderDiario();
 });
@@ -1379,18 +1756,23 @@ function updateDiarioStats(){
   document.getElementById('dAvgJulia').textContent = formatNum(avgJ);
 }
 
-document.querySelectorAll('#diarioSortRow .toggle-chip').forEach(chip=>{
-  chip.addEventListener('click', ()=>{
-    document.querySelectorAll('#diarioSortRow .toggle-chip').forEach(c=>c.classList.remove('active'));
-    chip.classList.add('active');
-    activeDiarioSort = chip.dataset.sort;
-    renderDiario();
-  });
+const diarioSortDropdown = createOptionDropdown(document.getElementById('diarioSortRow'), {
+  icon: 'sort',
+  options: [
+    {id:'recent', label:'Recentes'},
+    {id:'oldest', label:'Mais antigos'},
+    {id:'best', label:'Melhores notas'},
+    {id:'worst', label:'Piores notas'},
+    {id:'custom', label:'Minha ordem'},
+  ],
+  value: activeDiarioSort,
+  onSelect: (v)=>{ activeDiarioSort = v; renderDiario(); }
 });
 diarioSearch.addEventListener('input', renderDiario);
 
 const diarioGenreFilter = createGenreDropdown(document.getElementById('diarioGenreFilterRow'), {
   allLabel: 'Todos os gêneros',
+  buttonLabel: 'Gêneros',
   onSelect: ()=> renderDiario()
 });
 
@@ -1454,7 +1836,7 @@ function setupPosterPicker(previewEl, fileInputEl, clearBtnEl){
       clearBtnEl.style.display = 'block';
     } else if(entry){
       clearBtnEl.style.display = 'none';
-      lazyLoadPoster(previewEl, {id:entry.id, t:entry.title, y:entry.y || ''}, '');
+      lazyLoadPoster(previewEl, {id:entry.id, t:entry.title, y:entry.y || entry.year || '', tmdbId:entry.tmdbId || null}, '');
     } else {
       previewEl.innerHTML = posterPlaceholderHTML;
       clearBtnEl.style.display = 'none';
@@ -1493,8 +1875,36 @@ const diarioGenrePicker = createGenreMultiPicker(document.getElementById('diario
   emptyLabel: 'Sem categoria'
 });
 
+// Decide quais dados do TMDB salvar: os da sugestão escolhida (se o nome
+// ainda é o dela), os que o registro já tinha (se o nome não mudou) ou nada.
+function resolveTmdbFields(pick, entry, title){
+  if(pick && pick.title === title) return { tmdbId: pick.tmdbId ?? null, year: pick.year ?? null, overview: pick.overview ?? null };
+  if(entry && entry.title === title) return { tmdbId: entry.tmdbId ?? null, year: entry.year ?? null, overview: entry.overview ?? null };
+  return { tmdbId: null, year: null, overview: null };
+}
+function tmdbPickOf(r){
+  return { title: r.title, tmdbId: r.id, year: tmdbYear(r) || null, overview: r.overview || null };
+}
+
+let diarioTmdbPick = null;
+const diarioSuggest = attachMovieSuggest(diarioTitleInput, document.getElementById('diarioSuggest'), {
+  onPickTmdb: (r)=>{
+    diarioTitleInput.value = r.title;
+    updateDiarioDupWarning();
+    diarioTmdbPick = tmdbPickOf(r);
+    const poster = tmdbPoster(r.poster_path);
+    if(poster){
+      diarioPoster.state.pending = poster;
+      diarioPoster.render({ poster });
+    }
+    if(!diarioGenrePicker.getValues().length) diarioGenrePicker.setValues(mapTmdbGenres(r.genre_ids));
+  },
+});
+
 function openDiarioModal(entry, prefill){
   diarioEditId = entry ? entry.id : null;
+  diarioTmdbPick = (!entry && prefill && prefill.tmdb && prefill.tmdb.tmdbId) ? { ...prefill.tmdb, title: prefill.title } : null;
+  diarioSuggest.hide();
   currentDiarioOscarId = entry ? (entry.oscarId ?? null) : ((prefill && prefill.oscarId != null) ? prefill.oscarId : null);
   diarioModalEyebrow.textContent = entry ? 'Editar filme' : 'Novo filme';
   diarioTitleInput.value = entry ? entry.title : ((prefill && prefill.title) || '');
@@ -1553,25 +1963,20 @@ diarioModalSave.addEventListener('click', ()=>{
   let addedAt = Date.now();
   const pendingPoster = diarioPoster.state.pending;
   let poster = pendingPoster !== undefined ? pendingPoster : null;
+  const existingEntry = entryId ? diario.find(e => e.id === entryId) : null;
+  const tmdbFields = resolveTmdbFields(diarioTmdbPick, existingEntry, title);
   if(entryId){
-    const entry = diario.find(e => e.id === entryId);
+    const entry = existingEntry;
     addedAt = entry ? entry.addedAt : Date.now();
     if(pendingPoster === undefined) poster = entry ? (entry.poster || null) : null;
-    if(entry && entry.title !== title){
+    if(entry && (entry.title !== title || (entry.tmdbId ?? null) !== tmdbFields.tmdbId)){
       delete wikiCache[entry.id];
       saveWikiCache();
     }
-    entry.title = title;
-    entry.where = selectedWhere;
-    entry.notaPaulo = p;
-    entry.notaJulia = j;
-    entry.obs = obs;
-    entry.poster = poster;
-    entry.genres = genres;
-    entry.oscarId = currentDiarioOscarId;
+    Object.assign(entry, { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, poster, genres, oscarId:currentDiarioOscarId, ...tmdbFields });
   } else {
     entryId = 'd'+Date.now();
-    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genres, oscarId:currentDiarioOscarId });
+    diario.push({ id:entryId, title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genres, oscarId:currentDiarioOscarId, ...tmdbFields });
   }
   saveDiarioLocal();
 
@@ -1589,7 +1994,8 @@ diarioModalSave.addEventListener('click', ()=>{
   updateDiarioStats();
 
   if(cloudEnabled){
-    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genres, oscarId:linkedOscarId })
+    // merge: preserva campos que não são editados aqui (ex: a ordem personalizada)
+    setDoc(doc(diarioColRef, entryId), { title, where:selectedWhere, notaPaulo:p, notaJulia:j, obs, addedAt, poster, genres, oscarId:linkedOscarId, ...tmdbFields }, { merge:true })
       .catch(err => logCloudError('Falha ao sincronizar filme do diário', err));
   }
 
@@ -1698,6 +2104,7 @@ const watchlistGenrePicker = createGenreMultiPicker(watchlistGenreRow, {
 // Dropdown de filtro por categoria na lista ("mood do dia")
 const watchlistGenreFilter = createGenreDropdown(watchlistGenreFilterRow, {
   allLabel: 'Todos os gêneros',
+  buttonLabel: 'Gêneros',
   onSelect: ()=> renderWatchlist()
 });
 
@@ -1708,11 +2115,9 @@ function renderWatchlist(){
     watchlistGrid.innerHTML = '';
     sorted.forEach(e=>{
       const genresHtml = genreChipsHtml(entryGenres(e));
-      const color = primaryGenreColor(e);
       const card = document.createElement('div');
       card.className = 'movie-card reorder-item';
       card.dataset.entryId = e.id;
-      if(color) card.style.borderLeftColor = color;
       card.innerHTML = `
         <div class="drag-handle">${iconHtml('grip-vertical')}</div>
         <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
@@ -1726,7 +2131,7 @@ function renderWatchlist(){
       if(e.poster){
         posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
       } else {
-        lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+        lazyLoadPoster(posterEl, lookupOf(e), 'm-poster-img');
       }
     });
     watchlistEmpty.style.display = sorted.length===0 ? 'block' : 'none';
@@ -1748,40 +2153,43 @@ function renderWatchlist(){
 
     if(watchlistView === 'mural'){
       card.className = 'mural-card';
+      const hype = hypeHtml(e);
       card.innerHTML = `
         <div class="mural-poster"><div class="skeleton-poster"></div></div>
+        ${hype ? `<div class="mural-hype">${hype}</div>` : ''}
         <div class="mural-overlay">
           <div>${color ? `<span class="mural-dot" style="background:${color}"></span>` : ''}${escapeHtml(e.title)}</div>
           ${genresHtml ? `<div class="mural-genres">${genresHtml}</div>` : ''}
         </div>
       `;
-      card.addEventListener('click', ()=> openMovieView(e, 'watchlist'));
+      card.addEventListener('click', ()=> openMovieView(e, 'watchlist', card));
       watchlistGrid.appendChild(card);
       const muralPosterEl = card.querySelector('.mural-poster');
       if(e.poster){
         muralPosterEl.innerHTML = `<img src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
       } else {
-        lazyLoadPoster(muralPosterEl, {id:e.id, t:e.title, y:''}, '');
+        lazyLoadPoster(muralPosterEl, lookupOf(e), '');
       }
       return;
     }
 
     card.className = 'movie-card';
-    if(color) card.style.borderLeftColor = color;
+    const hype = hypeHtml(e);
     card.innerHTML = `
       <div class="m-poster">${e.poster ? '' : '<div class="skeleton-poster"></div>'}</div>
       <div class="m-info">
         <div class="m-title">${escapeHtml(e.title)}</div>
-        ${genresHtml ? `<div class="m-genres-inline">${genresHtml}</div>` : ''}
+        ${(genresHtml || hype) ? `<div class="m-sub">${hype}${genresHtml}</div>` : ''}
+        ${e.description ? `<div class="m-desc">${escapeHtml(truncate(e.description, 90))}</div>` : ''}
       </div>
     `;
-    card.addEventListener('click', ()=> openMovieView(e, 'watchlist'));
+    card.addEventListener('click', ()=> openMovieView(e, 'watchlist', card));
     watchlistGrid.appendChild(card);
     const posterEl = card.querySelector('.m-poster');
     if(e.poster){
       posterEl.innerHTML = `<img class="m-poster-img" src="${e.poster}" alt="${escapeHtml(e.title)}" loading="lazy">`;
     } else {
-      lazyLoadPoster(posterEl, {id:e.id, t:e.title, y:''}, 'm-poster-img');
+      lazyLoadPoster(posterEl, lookupOf(e), 'm-poster-img');
     }
   });
 
@@ -1815,10 +2223,10 @@ watchlistReorderBtn.addEventListener('click', ()=>{
   playClick();
   watchlistReorderMode = !watchlistReorderMode;
   watchlistReorderBtn.classList.toggle('active', watchlistReorderMode);
-  watchlistReorderBtn.querySelector('span').textContent = watchlistReorderMode ? 'Concluir' : 'Reorganizar';
+  watchlistReorderBtn.querySelector('span').textContent = watchlistReorderMode ? 'Concluir' : 'Ordem';
   watchlistReorderHint.classList.toggle('show', watchlistReorderMode);
-  watchlistSearch.style.display = watchlistReorderMode ? 'none' : '';
-  document.getElementById('watchlistGenreFilterRow').style.display = watchlistReorderMode ? 'none' : '';
+  document.getElementById('watchlistSearchWrap').style.display = watchlistReorderMode ? 'none' : '';
+  document.querySelector('#panel-watchlist .toolbar-filters').style.visibility = watchlistReorderMode ? 'hidden' : '';
   document.getElementById('watchlistViewToggle').style.display = watchlistReorderMode ? 'none' : '';
   renderWatchlist();
 });
@@ -1840,8 +2248,60 @@ watchlistViewToggle.addEventListener('click', (ev)=>{
 });
 updateWatchlistViewToggle();
 
+// "Quer muito ver": cada um pode marcar — aumenta a chance na roleta
+const watchlistWantBtns = {
+  paulo: document.getElementById('watchlistWantPaulo'),
+  julia: document.getElementById('watchlistWantJulia'),
+};
+let watchlistWant = { paulo:false, julia:false };
+function updateWantButtons(){
+  Object.entries(watchlistWantBtns).forEach(([who, btn]) => btn.classList.toggle('active', !!watchlistWant[who]));
+}
+Object.entries(watchlistWantBtns).forEach(([who, btn])=>{
+  btn.addEventListener('click', ()=>{
+    playClick();
+    watchlistWant[who] = !watchlistWant[who];
+    updateWantButtons();
+  });
+});
+function hypeWeight(e){ return 1 + (e.wantPaulo ? 1 : 0) + (e.wantJulia ? 1 : 0); }
+function hypeHtml(e){
+  return (e.wantPaulo ? `<span class="hype-chip p" title="Paulo quer muito">${iconHtml('flame')}</span>` : '')
+       + (e.wantJulia ? `<span class="hype-chip j" title="Julia quer muito">${iconHtml('flame')}</span>` : '');
+}
+
+// Dados que passam da watchlist pro Diário quando marcam "já assisti"
+function watchlistToDiarioPrefill(entry){
+  return {
+    title: entry.title,
+    poster: entry.poster,
+    genres: entryGenres(entry),
+    tmdb: entry.tmdbId ? { tmdbId: entry.tmdbId, year: entry.year ?? null, overview: entry.overview ?? null } : null,
+  };
+}
+
+let watchlistTmdbPick = null;
+const watchlistSuggest = attachMovieSuggest(watchlistTitleInput, document.getElementById('watchlistSuggest'), {
+  onPickTmdb: (r)=>{
+    watchlistTitleInput.value = r.title;
+    updateWatchlistDupWarning();
+    watchlistTmdbPick = tmdbPickOf(r);
+    const poster = tmdbPoster(r.poster_path);
+    if(poster){
+      watchlistPoster.state.pending = poster;
+      watchlistPoster.render({ poster });
+    }
+    if(!watchlistGenrePicker.getValues().length) watchlistGenrePicker.setValues(mapTmdbGenres(r.genre_ids));
+    if(!watchlistDescInput.value.trim() && r.overview) watchlistDescInput.value = r.overview;
+  },
+});
+
 function openWatchlistModal(entry){
   watchlistEditId = entry ? entry.id : null;
+  watchlistTmdbPick = null;
+  watchlistSuggest.hide();
+  watchlistWant = { paulo: !!(entry && entry.wantPaulo), julia: !!(entry && entry.wantJulia) };
+  updateWantButtons();
   watchlistModalEyebrow.textContent = entry ? 'Editar item' : 'Novo filme pra ver';
   watchlistTitleInput.value = entry ? entry.title : '';
   updateWatchlistDupWarning();
@@ -1878,21 +2338,21 @@ watchlistModalSave.addEventListener('click', ()=>{
   let addedAt = Date.now();
   const pendingPoster = watchlistPoster.state.pending;
   let poster = pendingPoster !== undefined ? pendingPoster : null;
+  const existingEntry = entryId ? watchlist.find(e => e.id === entryId) : null;
+  const tmdbFields = resolveTmdbFields(watchlistTmdbPick, existingEntry, title);
+  const want = { wantPaulo: !!watchlistWant.paulo, wantJulia: !!watchlistWant.julia };
   if(entryId){
-    const entry = watchlist.find(e => e.id === entryId);
+    const entry = existingEntry;
     addedAt = entry ? entry.addedAt : Date.now();
     if(pendingPoster === undefined) poster = entry ? (entry.poster || null) : null;
-    if(entry && entry.title !== title){
+    if(entry && (entry.title !== title || (entry.tmdbId ?? null) !== tmdbFields.tmdbId)){
       delete wikiCache[entry.id];
       saveWikiCache();
     }
-    entry.title = title;
-    entry.description = description;
-    entry.poster = poster;
-    entry.genres = genres;
+    Object.assign(entry, { title, description, poster, genres, ...tmdbFields, ...want });
   } else {
     entryId = 'w'+Date.now();
-    watchlist.push({ id:entryId, title, description, addedAt, poster, genres });
+    watchlist.push({ id:entryId, title, description, addedAt, poster, genres, ...tmdbFields, ...want });
   }
   saveWatchlistLocal();
   closeWatchlistModal();
@@ -1900,7 +2360,8 @@ watchlistModalSave.addEventListener('click', ()=>{
   updateWatchlistStats();
 
   if(cloudEnabled){
-    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genres })
+    // merge: preserva campos que não são editados aqui (ex: a ordem personalizada)
+    setDoc(doc(watchlistColRef, entryId), { title, description, addedAt, poster, genres, ...tmdbFields, ...want }, { merge:true })
       .catch(err => logCloudError('Falha ao sincronizar item da watchlist', err));
   }
 });
@@ -1930,7 +2391,7 @@ watchlistMarkWatched.addEventListener('click', ()=>{
   playClick();
   convertingWatchlistId = entry.id;
   closeWatchlistModal();
-  openDiarioModal(null, { title: entry.title, poster: entry.poster, genres: entryGenres(entry) });
+  openDiarioModal(null, watchlistToDiarioPrefill(entry));
 });
 
 watchlistModalClose.addEventListener('click', closeWatchlistModal);
@@ -1958,40 +2419,117 @@ const movieViewObsText = document.getElementById('movieViewObsText');
 const movieViewEditBtn = document.getElementById('movieViewEditBtn');
 const movieViewMarkWatchedBtn = document.getElementById('movieViewMarkWatchedBtn');
 
-let viewingMovieEntry = null;
-let viewingMovieKind = null; // 'diario' | 'watchlist'
+const movieViewBackdrop = document.getElementById('movieViewBackdrop');
+const movieViewCard = movieViewOverlay.querySelector('.view-card');
+const movieViewOverviewSection = document.getElementById('movieViewOverviewSection');
+const movieViewOverviewText = document.getElementById('movieViewOverviewText');
+const movieViewProvidersSection = document.getElementById('movieViewProvidersSection');
+const movieViewProviders = document.getElementById('movieViewProviders');
+const movieViewEyebrow = document.getElementById('movieViewEyebrow');
 
-function openMovieView(entry, kind){
+let viewingMovieEntry = null;
+let viewingMovieKind = null; // 'diario' | 'watchlist' | 'favorito'
+
+function setMovieViewImage(src, title){
+  movieViewPhoto.innerHTML = src
+    ? `<img src="${src}" alt="${escapeHtml(title)}" onerror="handlePosterError(this)">`
+    : posterPlaceholderHTML;
+  movieViewBackdrop.style.backgroundImage = src ? `url("${src}")` : '';
+  applyTint(movieViewCard, src);
+}
+
+/* "Capa que voa": ao abrir um filme, o pôster do card viaja até a tela
+   de leitura (e volta ao fechar). Usa a View Transitions API dos
+   navegadores recentes; onde não existe, abre normal. */
+const canFlyPoster = typeof document.startViewTransition === 'function'
+  && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let viewOriginPoster = null;
+
+function originPosterOf(el){
+  if(!el) return null;
+  return el.matches('.m-poster, .mural-poster, .fav-poster') ? el : el.querySelector('.m-poster, .mural-poster, .fav-poster');
+}
+function loadedImgSrc(posterEl){
+  const img = posterEl && posterEl.querySelector('img');
+  return img && img.complete && img.naturalWidth ? (img.currentSrc || img.src) : null;
+}
+function isOnScreen(el){
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.bottom > 0 && r.top < window.innerHeight;
+}
+let currentFly = null;
+function flyPoster(fromEl, toEl, update){
+  // Uma animação ainda rodando (clique rápido): conclui ela na hora
+  if(currentFly){ currentFly.skipTransition(); currentFly = null; }
+  if(!canFlyPoster || !fromEl || !toEl || !fromEl.isConnected || !isOnScreen(fromEl)){ update(); return; }
+  fromEl.style.viewTransitionName = 'poster-fly';
+  document.documentElement.classList.add('vt-poster');
+  const t = document.startViewTransition(()=>{
+    fromEl.style.viewTransitionName = '';
+    toEl.style.viewTransitionName = 'poster-fly';
+    update();
+  });
+  currentFly = t;
+  t.finished.finally(()=>{
+    fromEl.style.viewTransitionName = '';
+    toEl.style.viewTransitionName = '';
+    document.documentElement.classList.remove('vt-poster');
+    if(currentFly === t) currentFly = null;
+  });
+}
+
+function openMovieView(entry, kind, originEl){
   viewingMovieEntry = entry;
   viewingMovieKind = kind;
+  const fromPoster = originPosterOf(originEl);
+  viewOriginPoster = fromPoster;
 
   movieViewPhoto.innerHTML = '<div class="skeleton-poster"></div>';
-  if(entry.poster){
-    movieViewPhoto.innerHTML = `<img src="${entry.poster}" alt="${escapeHtml(entry.title)}">`;
+  movieViewBackdrop.style.backgroundImage = '';
+  // A capa que já está carregada no card serve na hora (e é ela que "voa")
+  const knownPoster = (kind === 'favorito' ? favoritePoster(entry) : entry.poster) || loadedImgSrc(fromPoster);
+  if(knownPoster){
+    setMovieViewImage(knownPoster, entry.title);
   } else {
-    getMovieInfo({ id: entry.id, t: entry.title, y: '' }).then(info=>{
+    const lookupId = kind === 'favorito' ? (entry.diarioId || entry.id) : entry.id;
+    getMovieInfo({ id: lookupId, t: entry.title, y: entry.year || '', tmdbId: entry.tmdbId || null }).then(info=>{
       if(viewingMovieEntry !== entry) return;
-      movieViewPhoto.innerHTML = (info && info.found && info.image)
-        ? `<img src="${info.image}" alt="${escapeHtml(entry.title)}" onerror="handlePosterError(this)">`
-        : posterPlaceholderHTML;
+      setMovieViewImage((info && info.found && info.image) ? info.image : null, entry.title);
     }).catch(()=>{
-      if(viewingMovieEntry === entry) movieViewPhoto.innerHTML = posterPlaceholderHTML;
+      if(viewingMovieEntry === entry) setMovieViewImage(null, entry.title);
     });
   }
 
-  const genresHtml = genreChipsHtml(entryGenres(entry));
+  const eyebrows = {
+    diario: 'No nosso diário',
+    watchlist: 'Na lista pra ver',
+    favorito: entry.who === 'julia' ? 'Favorito da Julia' : 'Favorito do Paulo',
+  };
+  movieViewEyebrow.textContent = eyebrows[kind] || '';
+  movieViewEyebrow.className = 'view-eyebrow' + (kind === 'favorito' ? ' who-' + entry.who : '');
+
+  const genresHtml = kind === 'favorito' ? '' : genreChipsHtml(entryGenres(entry));
   movieViewGenres.innerHTML = genresHtml;
   movieViewGenres.style.display = genresHtml ? 'flex' : 'none';
 
   movieViewTitle.textContent = entry.title;
 
+  const metaParts = [];
   if(kind === 'diario' && entry.where){
     const whereIcon = entry.where === 'Cinema' ? 'clapperboard' : 'sofa';
-    movieViewMeta.innerHTML = `<span>${iconHtml(whereIcon)} ${escapeHtml(entry.where)}</span>`;
-    movieViewMeta.style.display = 'flex';
-  } else {
-    movieViewMeta.style.display = 'none';
+    metaParts.push(`<span>${iconHtml(whereIcon)} ${escapeHtml(entry.where)}</span>`);
   }
+  if(entry.year) metaParts.unshift(`<span>${escapeHtml(String(entry.year))}</span>`);
+  if(kind === 'diario'){
+    const media = computeMedia(entry);
+    if(media != null) metaParts.push(`<span class="view-meta-media">${iconHtml('star')} ${formatNum(media)} de média</span>`);
+  }
+  if(kind === 'watchlist' && (entry.wantPaulo || entry.wantJulia)){
+    const who = [entry.wantPaulo && 'Paulo', entry.wantJulia && 'Julia'].filter(Boolean).join(' e ');
+    metaParts.push(`<span class="view-meta-hype">${iconHtml('flame')} ${who} ${entry.wantPaulo && entry.wantJulia ? 'querem' : 'quer'} muito</span>`);
+  }
+  movieViewMeta.innerHTML = metaParts.join('');
+  movieViewMeta.style.display = metaParts.length ? 'flex' : 'none';
 
   if(kind === 'diario'){
     movieViewRating.style.display = 'flex';
@@ -2002,7 +2540,7 @@ function openMovieView(entry, kind){
   }
 
   const obsContent = kind === 'diario' ? entry.obs : entry.description;
-  movieViewObsTitle.textContent = kind === 'diario' ? 'Nossa resenha' : 'Sinopse';
+  movieViewObsTitle.textContent = { diario:'Nossa resenha', watchlist:'Sobre', favorito:'Por que é favorito' }[kind];
   if(obsContent){
     movieViewObsSection.style.display = 'block';
     movieViewObsText.textContent = obsContent;
@@ -2010,31 +2548,54 @@ function openMovieView(entry, kind){
     movieViewObsSection.style.display = 'none';
   }
 
+  // Sinopse oficial (do TMDB), quando não é o mesmo texto já mostrado acima
+  const overview = entry.overview && entry.overview !== obsContent ? entry.overview : '';
+  movieViewOverviewSection.style.display = overview ? 'block' : 'none';
+  movieViewOverviewText.textContent = overview;
+
+  // Onde assistir: faz sentido pra quem ainda vai ver (watchlist) e pros favoritos
+  if(tmdbEnabled() && (kind === 'watchlist' || kind === 'favorito')){
+    movieViewProvidersSection.style.display = 'block';
+    const lookup = kind === 'favorito'
+      ? { id: entry.diarioId || entry.id, t: entry.title, y: entry.year || '', tmdbId: entry.tmdbId || null }
+      : lookupOf(entry);
+    renderProviders(movieViewProviders, lookup, movieViewProvidersSection);
+  } else {
+    movieViewProvidersSection.style.display = 'none';
+    movieViewProviders._provToken = null;
+  }
+
   movieViewMarkWatchedBtn.style.display = kind === 'watchlist' ? 'flex' : 'none';
 
-  movieViewOverlay.classList.add('open');
+  flyPoster(fromPoster, movieViewPhoto, ()=> movieViewOverlay.classList.add('open'));
 }
-function closeMovieView(){
-  movieViewOverlay.classList.remove('open');
+// instant=true quando a tela fecha pra abrir outra (editar, mover pro Diário):
+// aí a capa não volta voando pro card.
+function closeMovieView(instant){
+  const back = instant === true ? null : viewOriginPoster;
+  viewOriginPoster = null;
   viewingMovieEntry = null;
   viewingMovieKind = null;
+  if(!movieViewOverlay.classList.contains('open')) return;
+  flyPoster(back ? movieViewPhoto : null, back, ()=> movieViewOverlay.classList.remove('open'));
 }
 movieViewClose.addEventListener('click', closeMovieView);
 movieViewOverlay.addEventListener('click', (e)=>{ if(e.target === movieViewOverlay) closeMovieView(); });
 
 movieViewEditBtn.addEventListener('click', ()=>{
   const entry = viewingMovieEntry, kind = viewingMovieKind;
-  closeMovieView();
+  closeMovieView(true);
   if(kind === 'diario') openDiarioModal(entry);
+  else if(kind === 'favorito') openFavModal(entry.who, entry.slot);
   else openWatchlistModal(entry);
 });
 movieViewMarkWatchedBtn.addEventListener('click', ()=>{
   if(!viewingMovieEntry) return;
   const entry = viewingMovieEntry;
   playClick();
-  closeMovieView();
+  closeMovieView(true);
   convertingWatchlistId = entry.id;
-  openDiarioModal(null, { title: entry.title, poster: entry.poster, genres: entryGenres(entry) });
+  openDiarioModal(null, watchlistToDiarioPrefill(entry));
 });
 
 document.addEventListener('keydown', (e)=>{
@@ -2042,6 +2603,8 @@ document.addEventListener('keydown', (e)=>{
   if(diarioModalOverlay.classList.contains('open')) closeDiarioModal();
   if(watchlistModalOverlay.classList.contains('open')) closeWatchlistModal();
   if(movieViewOverlay.classList.contains('open')) closeMovieView();
+  if(favModalOverlay.classList.contains('open')) closeFavModal();
+  if(settingsOverlay.classList.contains('open')) closeSettings();
 });
 
 /* =====================================================
@@ -2074,10 +2637,8 @@ const wrGenreChipsEl = document.getElementById('wrGenreChips');
 const wrPoolHint = document.getElementById('wrPoolHint');
 const wrHasItems = document.getElementById('wrHasItems');
 const wrEmptyState = document.getElementById('wrEmptyState');
-const wrWheelCanvas = document.getElementById('wrWheelCanvas');
-const wrWheelCtx = wrWheelCanvas.getContext('2d');
-const wrWheelWrap = document.getElementById('wrWheelWrap');
-const wrWheelHalo = document.getElementById('wrWheelHalo');
+const slotMachine = document.getElementById('slotMachine');
+const slotStrip = document.getElementById('slotStrip');
 const wrSpinBtn = document.getElementById('wrSpinBtn');
 const wrResultCard = document.getElementById('wrResultCard');
 const wrGenreTag = document.getElementById('wrGenreTag');
@@ -2086,11 +2647,9 @@ const wrMedia = document.getElementById('wrMedia');
 const wrActions = document.getElementById('wrActions');
 const wrMarkWatched = document.getElementById('wrMarkWatched');
 const wrSpinAgain = document.getElementById('wrSpinAgain');
-const wrHub = watchlistRouletteMode.querySelector('.hub');
 
 let wrSelectedGenres = new Set();
 let wrPool = [];
-let wrCurrentRotation = 0;
 let wrSpinning = false;
 let wrCurrentPick = null;
 
@@ -2118,99 +2677,172 @@ MOVIE_GENRES.forEach(g=>{
 });
 
 function getWatchlistPool(){
-  if(wrSelectedGenres.size === 0) return watchlist.slice();
-  return watchlist.filter(e => entryGenres(e).some(g => wrSelectedGenres.has(g)));
+  return watchlist
+    .filter(e => !isVetoed('w:' + e.id))
+    .filter(e => wrSelectedGenres.size === 0 || entryGenres(e).some(g => wrSelectedGenres.has(g)));
+}
+
+// Fatias da roleta proporcionais ao peso (1 + um por quem "quer muito")
+function wheelSegments(pool){
+  const total = pool.reduce((s, e) => s + hypeWeight(e), 0) || 1;
+  let acc = 0;
+  return pool.map(item => {
+    const size = (hypeWeight(item) / total) * Math.PI * 2;
+    const seg = { item, start: acc, size };
+    acc += size;
+    return seg;
+  });
 }
 
 function renderWatchlistRoulette(){
   wrPool = getWatchlistPool();
-  const total = watchlist.length;
-  if(wrSelectedGenres.size === 0){
-    wrPoolHint.textContent = total ? `${total} filme${total===1?'':'s'} na roleta` : '';
-  } else {
-    wrPoolHint.textContent = `${wrPool.length} filme${wrPool.length===1?'':'s'} com essas categorias`;
-  }
+  const n = wrPool.length;
+  const vetoed = watchlist.filter(e => isVetoed('w:' + e.id)).length;
+  const parts = [];
+  if(n) parts.push(`${n} filme${n===1?'':'s'} ${wrSelectedGenres.size ? 'com essas categorias' : 'na roleta'}`);
+  const hyped = wrPool.filter(e => hypeWeight(e) > 1).length;
+  if(hyped) parts.push(`${hyped} com chance extra`);
+  if(vetoed) parts.push(`${vetoed} vetado${vetoed===1?'':'s'} hoje`);
+  wrPoolHint.textContent = parts.join(' · ');
   const hasItems = wrPool.length > 0;
   wrHasItems.hidden = !hasItems;
   wrEmptyState.style.display = hasItems ? 'none' : 'block';
-  if(hasItems) drawWatchlistWheel();
+  if(hasItems && !wrSpinning) renderSlotIdle();
 }
 
-const WR_NEUTRAL_A = '#4c1d95';
-const WR_NEUTRAL_B = '#831859';
+/* -----------------------------------------------------
+   Caça-níquel de pôsteres: uma fileira de capas passa por
+   trás da moldura central e desacelera até parar no filme
+   sorteado. Quem tem "quer muito" aparece mais vezes na
+   fileira (e tem mais chance, pelo mesmo peso da sorte).
+----------------------------------------------------- */
+let slotItems = [];      // filmes na fileira, na ordem
+let slotCenterIndex = 0; // qual célula está na moldura
 
-function drawWatchlistWheel(){
-  const size = wrWheelWrap.clientWidth || 340;
-  if(!size) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  wrWheelCanvas.width = size*dpr;
-  wrWheelCanvas.height = size*dpr;
-  wrWheelCanvas.style.width = size+'px';
-  wrWheelCanvas.style.height = size+'px';
-  wrWheelCtx.setTransform(dpr,0,0,dpr,0,0);
-  const r = size/2;
-  wrWheelCtx.clearRect(0,0,size,size);
+// Sorteio ponderado pelo "quer muito"
+function weightedPick(pool){
+  const segments = wheelSegments(pool);
+  let roll = Math.random() * Math.PI * 2;
+  const seg = segments.find(s => (roll -= s.size) < 0) || segments[segments.length - 1];
+  return seg.item;
+}
 
-  const n = wrPool.length || 1;
-  const angle = (Math.PI*2)/n;
-  for(let i=0;i<n;i++){
-    const start = -Math.PI/2 + i*angle;
-    const end = start + angle;
-    const item = wrPool[i];
-    const itemGenres = item ? entryGenres(item) : [];
-    const g = itemGenres.length ? genreById(itemGenres[0]) : null;
-    wrWheelCtx.beginPath();
-    wrWheelCtx.moveTo(r,r);
-    wrWheelCtx.arc(r,r,r,start,end);
-    wrWheelCtx.closePath();
-    wrWheelCtx.fillStyle = g ? g.color : (i%2===0 ? WR_NEUTRAL_A : WR_NEUTRAL_B);
-    wrWheelCtx.globalAlpha = g ? 0.82 : 1;
-    wrWheelCtx.fill();
-    wrWheelCtx.globalAlpha = 1;
-    wrWheelCtx.strokeStyle = 'rgba(255,255,255,0.25)';
-    wrWheelCtx.lineWidth = 1;
-    wrWheelCtx.stroke();
+function fillSlotPoster(cell, item){
+  const wrap = cell.querySelector('.slot-poster');
+  const show = (src)=>{
+    wrap.innerHTML = src
+      ? `<img src="${src}" alt="" draggable="false" onerror="this.remove()">`
+      : '';
+  };
+  if(item.poster){ show(item.poster); return; }
+  getMovieInfo(lookupOf(item))
+    .then(info => show(info && info.found && info.image ? info.image : null))
+    .catch(()=> show(null));
+}
+
+function buildSlotStrip(items){
+  slotItems = items;
+  slotStrip.innerHTML = '';
+  items.forEach(item=>{
+    const cell = document.createElement('div');
+    cell.className = 'slot-cell';
+    const hype = hypeHtml(item);
+    cell.innerHTML = `
+      <div class="slot-ph"><span>${escapeHtml(item.title)}</span></div>
+      <div class="slot-poster"></div>
+      ${hype ? `<div class="mural-hype">${hype}</div>` : ''}`;
+    slotStrip.appendChild(cell);
+    fillSlotPoster(cell, item);
+  });
+}
+
+// Deslocamento que deixa a célula `index` no centro da moldura
+function slotOffsetFor(index){
+  const cell = slotStrip.children[index];
+  if(!cell) return 0;
+  const windowW = slotStrip.parentElement.clientWidth;
+  return windowW/2 - (cell.offsetLeft + cell.offsetWidth/2);
+}
+function placeSlot(index, extra, transition){
+  slotStrip.style.transition = transition || 'none';
+  slotStrip.style.transform = `translate3d(${slotOffsetFor(index) + (extra || 0)}px,0,0)`;
+}
+
+// Fileira parada: embaralhada, com o último sorteado (se ainda vale) no centro
+function renderSlotIdle(){
+  if(!wrPool.length) return;
+  const shuffled = wrPool.slice().sort(()=> Math.random() - .5);
+  let items = shuffled;
+  while(items.length < 9) items = items.concat(shuffled);
+  items = items.slice(0, Math.max(9, Math.min(items.length, 15)));
+  const center = 4;
+  if(wrCurrentPick && wrPool.some(e => e.id === wrCurrentPick.id)){
+    items = items.filter(e => e.id !== wrCurrentPick.id);
+    items.splice(center, 0, wrCurrentPick);
   }
-
-  wrWheelCtx.beginPath();
-  wrWheelCtx.arc(r,r,r-1,0,Math.PI*2);
-  wrWheelCtx.strokeStyle = 'rgba(255,204,77,0.55)';
-  wrWheelCtx.lineWidth = 2;
-  wrWheelCtx.stroke();
+  buildSlotStrip(items);
+  slotCenterIndex = center;
+  slotStrip.children[center]?.classList.toggle('winner', !!(wrCurrentPick && items[center].id === wrCurrentPick.id));
+  placeSlot(center);
 }
-window.addEventListener('resize', ()=>{ if(rouletteMode === 'watchlist' && wrPool.length) drawWatchlistWheel(); });
+window.addEventListener('resize', ()=>{
+  if(rouletteMode === 'watchlist' && slotItems.length && !wrSpinning) placeSlot(slotCenterIndex);
+});
+
+const SLOT_SPIN_MS = 5200;
 
 function spinWatchlistWheel(){
   if(wrSpinning || wrPool.length === 0) return;
   wrSpinning = true;
   wrSpinBtn.disabled = true;
   wrResultCard.classList.remove('show');
-  wrWheelHalo.classList.add('spinning');
-  scheduleTicks(4600);
+  slotMachine.classList.add('spinning', 'fast');
+  clearTint(slotMachine);
+  scheduleTicks(SLOT_SPIN_MS - 300);
 
-  const targetIndex = Math.floor(Math.random()*wrPool.length);
-  const n = wrPool.length;
-  const angle = (Math.PI*2)/n;
-  const segCenterDeg = (targetIndex*angle + angle/2) * (180/Math.PI);
-  const targetMod = ((360 - segCenterDeg) % 360 + 360) % 360;
-  const extraSpins = 7 + Math.floor(Math.random()*3);
-  const curMod = ((wrCurrentRotation % 360) + 360) % 360;
-  const delta = ((targetMod - curMod) + 360) % 360;
-  wrCurrentRotation = wrCurrentRotation + extraSpins*360 + delta;
-  wrWheelWrap.style.transform = `rotate(${wrCurrentRotation}deg)`;
+  const picked = weightedPick(wrPool);
 
-  const onEnd = ()=>{
-    wrWheelWrap.removeEventListener('transitionend', onEnd);
-    wrSpinning = false;
-    wrSpinBtn.disabled = false;
-    wrWheelHalo.classList.remove('spinning');
-    showWatchlistResult(wrPool[targetIndex]);
-    burstConfetti(wrHub);
-    flareBurst(wrHub);
-    playChime();
-    if(navigator.vibrate) navigator.vibrate([30,40,70]);
+  // Começa pelas capas que já estão na tela (sem "pulo"), passa por uma
+  // fileira sorteada e termina no escolhido.
+  const lead = [];
+  for(let i = slotCenterIndex - 2; i <= slotCenterIndex + 2; i++){
+    lead.push(slotItems[i] || weightedPick(wrPool));
+  }
+  const RUN = 24;
+  const middle = Array.from({ length: RUN }, ()=> weightedPick(wrPool));
+  const tail = Array.from({ length: 4 }, ()=> weightedPick(wrPool));
+  const items = lead.concat(middle, [picked], tail);
+  const winIndex = lead.length + RUN;
+
+  buildSlotStrip(items);
+  placeSlot(2);
+  void slotStrip.offsetWidth; // aplica a posição inicial antes de animar
+
+  // Para um pouco fora do centro e depois "encaixa" — dá o suspense
+  const cellW = slotStrip.children[winIndex].offsetWidth;
+  const jitter = (Math.random() - .5) * cellW * .55;
+  placeSlot(winIndex, jitter, `transform ${SLOT_SPIN_MS}ms cubic-bezier(.1,.75,.12,1)`);
+  setTimeout(()=> slotMachine.classList.remove('fast'), SLOT_SPIN_MS * .55);
+
+  const onEnd = (ev)=>{
+    if(ev.target !== slotStrip || ev.propertyName !== 'transform') return;
+    slotStrip.removeEventListener('transitionend', onEnd);
+    placeSlot(winIndex, 0, 'transform 380ms cubic-bezier(.34,1.56,.64,1)');
+    setTimeout(()=>{
+      slotCenterIndex = winIndex;
+      wrSpinning = false;
+      wrSpinBtn.disabled = false;
+      slotMachine.classList.remove('spinning');
+      const winCell = slotStrip.children[winIndex];
+      winCell.classList.add('winner');
+      showWatchlistResult(picked);
+      burstConfetti(winCell);
+      flareBurst(winCell);
+      playChime();
+      if(navigator.vibrate) navigator.vibrate([30,40,70]);
+    }, 400);
   };
-  wrWheelWrap.addEventListener('transitionend', onEnd);
+  slotStrip.addEventListener('transitionend', onEnd);
 }
 
 function showWatchlistResult(item){
@@ -2224,17 +2856,21 @@ function showWatchlistResult(item){
     ? `<p>${escapeHtml(item.description)}</p>`
     : `<p class="r-no-info">Sem descrição guardada pra esse aqui.</p>`;
 
+  const tint = (src)=>{ applyTint(wrResultCard, src); applyTint(slotMachine, src); };
   if(item.poster){
+    tint(item.poster);
     wrMedia.innerHTML = `<div class="r-poster-wrap"><img class="r-poster" src="${item.poster}" alt="${escapeHtml(item.title)}" onerror="handlePosterError(this)"></div><div class="r-synopsis">${descHtml}</div>`;
   } else {
+    tint(null);
     // Sem capa enviada à mão: tenta buscar uma automaticamente, igual já
     // acontece na grade da watchlist — antes esse giro nunca tentava e só
     // mostrava o placeholder direto.
     wrMedia.innerHTML = `<div class="r-poster-wrap"><div class="skeleton-poster"></div></div><div class="r-synopsis">${descHtml}</div>`;
-    getMovieInfo({ id: item.id, t: item.title, y: '' }).then(info=>{
+    getMovieInfo(lookupOf(item)).then(info=>{
       if(!wrCurrentPick || wrCurrentPick.id !== item.id) return;
       const posterWrap = wrMedia.querySelector('.r-poster-wrap');
       if(!posterWrap) return;
+      tint(info && info.found ? info.image : null);
       posterWrap.innerHTML = (info && info.found && info.image)
         ? `<img class="r-poster" src="${info.image}" alt="${escapeHtml(item.title)}" loading="lazy" onerror="handlePosterError(this)">`
         : posterPlaceholderHTML;
@@ -2245,6 +2881,8 @@ function showWatchlistResult(item){
     });
   }
 
+  renderProviders(document.getElementById('wrProviders'), lookupOf(item));
+  renderVetoUi();
   requestAnimationFrame(()=> wrResultCard.classList.add('show'));
 }
 
@@ -2254,7 +2892,413 @@ wrMarkWatched.addEventListener('click', ()=>{
   if(!wrCurrentPick) return;
   playClick();
   convertingWatchlistId = wrCurrentPick.id;
-  openDiarioModal(null, { title: wrCurrentPick.title, poster: wrCurrentPick.poster, genres: entryGenres(wrCurrentPick) });
+  openDiarioModal(null, watchlistToDiarioPrefill(wrCurrentPick));
+});
+
+/* =====================================================
+   VETO — cada um pode vetar um sorteio por noite (vale pras
+   duas roletas). O filme vetado sai do sorteio até a próxima
+   sessão. A "noite" vira às 5h, pra sessão de madrugada contar
+   como a mesma. Fica em sync/sessao pra valer nos dois celulares.
+===================================================== */
+const SESSAO_STORAGE_KEY = 'cinema-pj-sessao';
+const sessaoDocRef = doc(db, 'sync', 'sessao');
+const WHO_LABEL = { paulo:'Paulo', julia:'Julia' };
+
+let sessao = {};
+try{ sessao = JSON.parse(localStorage.getItem(SESSAO_STORAGE_KEY) || '{}') || {}; }catch(e){ sessao = {}; }
+
+function sessionDay(){
+  const d = new Date(Date.now() - 5*3600*1000);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function currentVetoes(){
+  return (sessao && sessao.day === sessionDay() && Array.isArray(sessao.vetoes)) ? sessao.vetoes : [];
+}
+function vetoOf(who){ return currentVetoes().find(v => v.who === who) || null; }
+function isVetoed(key){ return currentVetoes().some(v => v.key === key); }
+
+function saveSessao(){
+  try{ localStorage.setItem(SESSAO_STORAGE_KEY, JSON.stringify(sessao)); }catch(e){}
+  if(cloudEnabled){
+    setDoc(sessaoDocRef, sessao).catch(err => logCloudError('Falha ao sincronizar os vetos', err));
+  }
+  renderVetoUi();
+  if(rouletteMode === 'watchlist') renderWatchlistRoulette();
+}
+function addVeto(who, key, title){
+  sessao = {
+    day: sessionDay(),
+    vetoes: currentVetoes().filter(v => v.who !== who).concat([{ who, key, title, at: Date.now() }]),
+  };
+  saveSessao();
+}
+function resetVetoes(){
+  sessao = { day: sessionDay(), vetoes: [] };
+  saveSessao();
+}
+
+function renderVetoRow(el, key, title){
+  if(!el) return;
+  if(!key){ el.innerHTML = ''; return; }
+  const vetoedBy = currentVetoes().find(v => v.key === key);
+  if(vetoedBy){
+    el.innerHTML = `<span class="veto-row-lbl">${iconHtml('ban')} Vetado por ${WHO_LABEL[vetoedBy.who]}</span>`;
+    return;
+  }
+  el.innerHTML = `<span class="veto-row-lbl">Não rolou?</span>` + ['paulo','julia'].map(who=>{
+    const used = vetoOf(who);
+    return `<button type="button" class="veto-btn ${who[0]}" data-who="${who}" ${used ? 'disabled' : ''} title="${used ? `Já vetou ${escapeHtml(used.title)} hoje` : ''}">
+      ${iconHtml('ban')} ${WHO_LABEL[who]} veta
+    </button>`;
+  }).join('');
+  el.dataset.key = key;
+  el.dataset.title = title;
+}
+
+function renderVetoUi(){
+  const vetoes = currentVetoes();
+  document.querySelectorAll('.veto-bar').forEach(bar=>{
+    bar.innerHTML = `<span class="veto-bar-lbl">Vetos da noite</span>`
+      + ['paulo','julia'].map(who=>{
+          const v = vetoOf(who);
+          return `<span class="veto-pill${v ? ' used' : ''}" title="${v ? `Vetou ${escapeHtml(v.title)}` : 'Ainda tem o veto'}">
+            <span class="rate-dot ${who[0]}"></span>${WHO_LABEL[who]}${v ? ' ' + iconHtml('ban') : ''}
+          </span>`;
+        }).join('')
+      + (vetoes.length ? `<button type="button" class="veto-reset" title="Devolve os vetos dos dois">${iconHtml('rotate-ccw')} Zerar</button>` : '');
+  });
+  renderVetoRow(document.getElementById('rVeto'), currentPick ? 'o:' + currentPick.id : null, currentPick ? currentPick.t : '');
+  renderVetoRow(document.getElementById('wrVeto'), wrCurrentPick ? 'w:' + wrCurrentPick.id : null, wrCurrentPick ? wrCurrentPick.title : '');
+}
+
+document.addEventListener('click', (ev)=>{
+  const reset = ev.target.closest('.veto-reset');
+  if(reset){ playClick(); resetVetoes(); return; }
+  const btn = ev.target.closest('.veto-btn');
+  if(!btn || btn.disabled) return;
+  const row = btn.closest('.veto-row');
+  const who = btn.dataset.who;
+  playClick();
+  addVeto(who, row.dataset.key, row.dataset.title);
+  if(navigator.vibrate) navigator.vibrate(40);
+  // Vetou: gira de novo sozinho, já sem o filme vetado
+  setTimeout(()=>{
+    if(row.id === 'rVeto') spin();
+    else spinWatchlistWheel();
+  }, 450);
+});
+
+/* =====================================================
+   CONFIGURAÇÕES — chave do TMDB e sons
+===================================================== */
+const settingsOverlay = document.getElementById('settingsOverlay');
+const tmdbStatus = document.getElementById('tmdbStatus');
+const tmdbSteps = document.getElementById('tmdbSteps');
+const tmdbKeyInput = document.getElementById('tmdbKeyInput');
+const tmdbKeySave = document.getElementById('tmdbKeySave');
+const tmdbKeyRemove = document.getElementById('tmdbKeyRemove');
+const tmdbMsg = document.getElementById('tmdbMsg');
+const soundToggle = document.getElementById('soundToggle');
+
+function openSettings(){
+  refreshTmdbUi();
+  tmdbMsg.textContent = '';
+  tmdbMsg.className = 'settings-msg';
+  soundToggle.checked = soundOn;
+  settingsOverlay.classList.add('open');
+}
+function closeSettings(){ settingsOverlay.classList.remove('open'); }
+document.getElementById('settingsBtn').addEventListener('click', ()=>{ playClick(); openSettings(); });
+document.getElementById('settingsClose').addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', (e)=>{ if(e.target === settingsOverlay) closeSettings(); });
+// Links "Ative o TMDB" dentro dos formulários
+document.addEventListener('click', (ev)=>{
+  if(!ev.target.closest('[data-open-settings]')) return;
+  ev.preventDefault();
+  openSettings();
+});
+
+function refreshTmdbUi(){
+  const on = tmdbEnabled();
+  tmdbStatus.textContent = on ? 'Conectado' : 'Desligado';
+  tmdbStatus.classList.toggle('on', on);
+  tmdbSteps.style.display = on ? 'none' : '';
+  tmdbKeyRemove.style.display = on ? 'block' : 'none';
+  tmdbKeyInput.placeholder = on ? 'Trocar a chave (cole uma nova)' : 'Cole a chave ou o token do TMDB';
+  updateTmdbHints();
+}
+
+// Aplica uma chave nova (ou remove, com ''). persist=true grava na nuvem.
+function setTmdbKey(key, persist){
+  const changed = key !== tmdbKey;
+  tmdbKey = key || '';
+  try{
+    if(tmdbKey) localStorage.setItem(TMDB_KEY_STORAGE, tmdbKey);
+    else localStorage.removeItem(TMDB_KEY_STORAGE);
+  }catch(e){}
+  if(persist && cloudEnabled){
+    setDoc(configDocRef, { tmdbKey: tmdbKey || null }, { merge:true })
+      .catch(err => logCloudError('Falha ao salvar a chave do TMDB', err));
+  }
+  refreshTmdbUi();
+  if(changed){
+    // Capas e sinopses passam a vir do TMDB conforme os cards aparecem
+    renderDiario();
+    renderWatchlist();
+    renderGrid();
+    renderFavorites();
+  }
+}
+
+tmdbKeySave.addEventListener('click', async ()=>{
+  const key = tmdbKeyInput.value.trim();
+  if(!key){ tmdbKeyInput.focus(); return; }
+  tmdbKeySave.disabled = true;
+  tmdbMsg.className = 'settings-msg';
+  tmdbMsg.textContent = 'Testando a chave…';
+  try{
+    await tmdbFetch('/configuration', {}, key);
+    setTmdbKey(key, true);
+    tmdbKeyInput.value = '';
+    tmdbMsg.className = 'settings-msg ok';
+    tmdbMsg.textContent = 'Pronto! A busca automática está ligada nos dois aparelhos.';
+    playChime();
+  }catch(err){
+    tmdbMsg.className = 'settings-msg err';
+    tmdbMsg.textContent = 'Essa chave não funcionou. Confira se copiou ela inteira.';
+  }
+  tmdbKeySave.disabled = false;
+});
+tmdbKeyInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') tmdbKeySave.click(); });
+tmdbKeyRemove.addEventListener('click', ()=>{
+  setTmdbKey('', true);
+  tmdbMsg.className = 'settings-msg';
+  tmdbMsg.textContent = 'TMDB desconectado. As capas voltam a vir da Wikipédia.';
+});
+
+soundToggle.addEventListener('change', ()=>{
+  soundOn = soundToggle.checked;
+  try{ localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off'); }catch(e){}
+  if(soundOn) playClick();
+});
+
+/* =====================================================
+   FAVORITOS — vitrine de cada um (estilo Letterboxd): alguns
+   filmes escolhidos à mão, com capa, nome e o porquê. Não
+   depende das notas — favorito é favorito.
+   Cada espaço é um documento "favoritos/{quem}-{posição}".
+===================================================== */
+const FAV_SLOTS = 4;
+const FAVORITOS_STORAGE_KEY = 'cinema-pj-favoritos';
+
+function loadFavoritos(){
+  try{
+    const raw = localStorage.getItem(FAVORITOS_STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return [];
+}
+function saveFavoritosLocal(){
+  try{ localStorage.setItem(FAVORITOS_STORAGE_KEY, JSON.stringify(favoritos)); }catch(e){}
+}
+let favoritos = loadFavoritos();
+
+function favId(who, slot){ return `${who}-${slot}`; }
+function findFavorite(who, slot){
+  return favoritos.find(f => f.who === who && f.slot === slot) || null;
+}
+// Capa do favorito: a enviada à mão tem prioridade; senão reaproveita a
+// capa do filme ligado no Diário (se tiver). Sem nenhuma das duas, quem
+// chama busca na Wikipédia.
+function favoritePoster(f){
+  if(f.poster) return f.poster;
+  const linked = f.diarioId ? diario.find(e => e.id === f.diarioId) : null;
+  return linked && linked.poster ? linked.poster : null;
+}
+
+const favShelves = {
+  julia: document.getElementById('favShelfJulia'),
+  paulo: document.getElementById('favShelfPaulo'),
+};
+
+function renderFavorites(){
+  Object.entries(favShelves).forEach(([who, shelf])=>{
+    shelf.innerHTML = '';
+    for(let slot = 1; slot <= FAV_SLOTS; slot++){
+      const f = findFavorite(who, slot);
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.style.animationDelay = (slot*0.05) + 's';
+      if(!f){
+        el.className = 'fav-slot empty';
+        el.setAttribute('aria-label', 'Escolher favorito');
+        el.innerHTML = `<div class="fav-poster">${iconHtml('plus')}</div><div class="fav-title">Escolher</div>`;
+        el.addEventListener('click', ()=>{ playClick(); openFavModal(who, slot); });
+      } else {
+        el.className = 'fav-slot';
+        el.innerHTML = `<div class="fav-poster"><div class="skeleton-poster"></div></div><div class="fav-title">${escapeHtml(f.title)}</div>`;
+        el.addEventListener('click', ()=> openMovieView(f, 'favorito', el));
+        const posterEl = el.querySelector('.fav-poster');
+        const poster = favoritePoster(f);
+        if(poster){
+          posterEl.innerHTML = `<img src="${poster}" alt="${escapeHtml(f.title)}" loading="lazy" onerror="handlePosterError(this)">`;
+        } else {
+          lazyLoadPoster(posterEl, {id: f.diarioId || f.id, t: f.title, y: f.year || '', tmdbId: f.tmdbId || null}, '');
+        }
+      }
+      shelf.appendChild(el);
+    }
+  });
+}
+
+const favModalOverlay = document.getElementById('favModalOverlay');
+const favModalEyebrow = document.getElementById('favModalEyebrow');
+const favTitleInput = document.getElementById('favTitleInput');
+const favSuggest = document.getElementById('favSuggest');
+const favDescInput = document.getElementById('favDescInput');
+const favModalSave = document.getElementById('favModalSave');
+const favModalRemove = document.getElementById('favModalRemove');
+const favModalClose = document.getElementById('favModalClose');
+const favPosterPreview = document.getElementById('favPosterPreview');
+const favPosterClear = document.getElementById('favPosterClear');
+const favPoster = setupPosterPicker(favPosterPreview, document.getElementById('favPosterFile'), favPosterClear);
+
+let favEditing = null; // { who, slot }
+let favLinkedDiarioId = null;
+
+// Mostra a capa que o favorito vai usar se ninguém enviar outra.
+function refreshFavPreview(){
+  if(favPoster.state.pending !== undefined) return; // já escolheram/limparam à mão
+  const existing = favEditing ? findFavorite(favEditing.who, favEditing.slot) : null;
+  if(existing && existing.poster){
+    favPoster.render({ poster: existing.poster });
+    return;
+  }
+  const linked = favLinkedDiarioId ? diario.find(e => e.id === favLinkedDiarioId) : null;
+  if(linked && linked.poster){
+    favPosterPreview.innerHTML = `<img src="${linked.poster}" alt="">`;
+    favPosterClear.style.display = 'none';
+  } else if(linked){
+    favPoster.render({ id: linked.id, title: linked.title });
+  } else if(existing){
+    favPoster.render({ id: existing.id, title: existing.title });
+  } else {
+    favPoster.render(null);
+  }
+}
+
+let favTmdbPick = null;
+const favSuggestCtl = attachMovieSuggest(favTitleInput, favSuggest, {
+  localItems: (q)=> diario.filter(e => normalizeTitle(e.title).includes(q)).slice(0, 4),
+  onPickLocal: (e)=>{
+    favTitleInput.value = e.title;
+    favLinkedDiarioId = e.id;
+    favTmdbPick = e.tmdbId ? { title: e.title, tmdbId: e.tmdbId, year: e.year ?? null } : null;
+    refreshFavPreview();
+    favDescInput.focus();
+  },
+  onPickTmdb: (r)=>{
+    favTitleInput.value = r.title;
+    favTmdbPick = tmdbPickOf(r);
+    const norm = normalizeTitle(r.title);
+    const inDiario = diario.find(e => e.tmdbId === r.id || normalizeTitle(e.title) === norm);
+    favLinkedDiarioId = inDiario ? inDiario.id : null;
+    const poster = tmdbPoster(r.poster_path);
+    if(poster){
+      favPoster.state.pending = poster;
+      favPoster.render({ poster });
+    } else {
+      refreshFavPreview();
+    }
+    favDescInput.focus();
+  },
+  // Digitou o nome exato de um filme do Diário: já liga os dois (e a capa)
+  onInput: ()=>{
+    const q = normalizeTitle(favTitleInput.value);
+    const exact = q ? diario.find(e => normalizeTitle(e.title) === q) : null;
+    const newLink = exact ? exact.id : null;
+    if(newLink !== favLinkedDiarioId){
+      favLinkedDiarioId = newLink;
+      refreshFavPreview();
+    }
+  },
+});
+function hideFavSuggest(){ favSuggestCtl.hide(); }
+
+function openFavModal(who, slot){
+  favEditing = { who, slot };
+  favTmdbPick = null;
+  const f = findFavorite(who, slot);
+  favModalEyebrow.textContent = (who === 'julia' ? 'Favorito da Julia' : 'Favorito do Paulo') + ` · ${slot}º lugar`;
+  favModalEyebrow.className = 'modal-eyebrow who-' + who;
+  favTitleInput.value = f ? f.title : '';
+  favDescInput.value = f ? (f.description || '') : '';
+  favLinkedDiarioId = f ? (f.diarioId || null) : null;
+  favModalRemove.style.display = f ? 'block' : 'none';
+  favPoster.state.pending = undefined;
+  refreshFavPreview();
+  hideFavSuggest();
+  favModalOverlay.classList.add('open');
+  setTimeout(()=> favTitleInput.focus(), 150);
+}
+function closeFavModal(){
+  favModalOverlay.classList.remove('open');
+  hideFavSuggest();
+  favEditing = null;
+}
+favModalClose.addEventListener('click', closeFavModal);
+favModalOverlay.addEventListener('click', (e)=>{ if(e.target === favModalOverlay) closeFavModal(); });
+
+favModalSave.addEventListener('click', ()=>{
+  if(!favEditing) return;
+  const title = favTitleInput.value.trim();
+  if(!title){ favTitleInput.focus(); return; }
+  playClick();
+  const { who, slot } = favEditing;
+  const id = favId(who, slot);
+  const existing = findFavorite(who, slot);
+  const pending = favPoster.state.pending;
+  const poster = pending !== undefined ? pending : (existing ? (existing.poster || null) : null);
+  const { tmdbId, year } = resolveTmdbFields(favTmdbPick, existing, title);
+  if(existing && (existing.title !== title || (existing.tmdbId ?? null) !== tmdbId)){
+    delete wikiCache[id];
+    saveWikiCache();
+  }
+  const record = {
+    who, slot, title,
+    description: favDescInput.value.trim(),
+    poster,
+    diarioId: favLinkedDiarioId,
+    tmdbId, year,
+    updatedAt: Date.now(),
+  };
+  favoritos = favoritos.filter(f => !(f.who === who && f.slot === slot)).concat([{ id, ...record }]);
+  saveFavoritosLocal();
+  if(!existing){
+    burstConfetti(favModalSave);
+    playChime();
+  }
+  closeFavModal();
+  renderFavorites();
+  if(cloudEnabled){
+    setDoc(doc(favoritosColRef, id), record).catch(err => logCloudError('Falha ao sincronizar favorito', err));
+  }
+});
+
+favModalRemove.addEventListener('click', ()=>{
+  if(!favEditing) return;
+  const { who, slot } = favEditing;
+  const id = favId(who, slot);
+  favoritos = favoritos.filter(f => !(f.who === who && f.slot === slot));
+  delete wikiCache[id];
+  saveWikiCache();
+  saveFavoritosLocal();
+  closeFavModal();
+  renderFavorites();
+  if(cloudEnabled){
+    deleteDoc(doc(favoritosColRef, id)).catch(err => logCloudError('Falha ao remover favorito no servidor', err));
+  }
 });
 
 /* =====================================================
@@ -2328,6 +3372,7 @@ function animateNumberTo(el, target){
 }
 
 function renderProfile(){
+  renderFavorites();
   const stats = computeProfileStats();
 
   animateNumberTo(document.getElementById('pTotal'), stats.total);
@@ -2363,7 +3408,7 @@ function renderProfile(){
       if(x.e.poster){
         posterEl.innerHTML = `<img class="m-poster-img" src="${x.e.poster}" alt="${escapeHtml(x.e.title)}" loading="lazy">`;
       } else {
-        lazyLoadPoster(posterEl, {id:x.e.id, t:x.e.title, y:''}, 'm-poster-img');
+        lazyLoadPoster(posterEl, lookupOf(x.e), 'm-poster-img');
       }
     });
   }
@@ -2390,7 +3435,7 @@ function renderProfile(){
       if(x.e.poster){
         posterEl.innerHTML = `<img class="m-poster-img" src="${x.e.poster}" alt="${escapeHtml(x.e.title)}" loading="lazy">`;
       } else {
-        lazyLoadPoster(posterEl, {id:x.e.id, t:x.e.title, y:''}, 'm-poster-img');
+        lazyLoadPoster(posterEl, lookupOf(x.e), 'm-poster-img');
       }
     });
   }
@@ -2446,10 +3491,23 @@ function setActiveTab(tab){
   Object.entries(panels).forEach(([name, el]) => { el.hidden = name !== tab; });
   localStorage.setItem(ACTIVE_TAB_KEY, tab);
   if(tab !== 'roleta'){ fabSpin.classList.remove('visible'); }
-  else { requestAnimationFrame(()=> drawWheel()); }
+  else {
+    requestAnimationFrame(()=>{
+      drawWheel();
+      // a fileira de pôsteres pode ter sido montada com a aba escondida
+      if(rouletteMode === 'watchlist' && slotItems.length && !wrSpinning) placeSlot(slotCenterIndex);
+    });
+  }
   if(tab === 'perfil'){ renderProfile(); }
 }
-tabBtns.forEach(b => b.addEventListener('click', ()=>{ playClick(); setActiveTab(b.dataset.tab); }));
+tabBtns.forEach(b => b.addEventListener('click', ()=>{
+  playClick();
+  const changed = b.dataset.tab !== activeTab;
+  setActiveTab(b.dataset.tab);
+  // Cada aba começa do topo (a navegação fica fixa embaixo, então sem
+  // isso a aba nova abriria no meio da rolagem da anterior).
+  if(changed) window.scrollTo({ top: 0, behavior: 'instant' });
+}));
 
 setActiveTab(activeTab);
 
@@ -2462,6 +3520,7 @@ setActiveTab(activeTab);
 const cloudStatusEl = document.getElementById('cloudStatus');
 
 function setCloudStatus(text, cls){
+  if(!cloudStatusEl) return;
   cloudStatusEl.innerHTML = text;
   cloudStatusEl.classList.remove('cloud-on', 'cloud-off');
   if(cls) cloudStatusEl.classList.add(cls);
@@ -2489,6 +3548,10 @@ function logCloudError(action, err){
 }
 
 async function initCloudSync(){
+  if(OFFLINE_MODE){
+    console.info('Modo offline (?offline): nuvem desligada, nada é sincronizado.');
+    return;
+  }
   try{
     await new Promise((resolve, reject)=>{
       const unsub = onAuthStateChanged(fbAuth, (user)=>{
@@ -2571,8 +3634,43 @@ async function initCloudSync(){
     console.warn('Falha ao sincronizar a watchlist (seguindo local só pra essa parte):', err);
   }
 
+  try{
+    onSnapshot(favoritosColRef, (snap)=>{
+      favoritos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      try{ localStorage.setItem(FAVORITOS_STORAGE_KEY, JSON.stringify(favoritos)); }catch(e){}
+      renderFavorites();
+    }, (err)=> console.warn('Falha ao escutar os favoritos:', err));
+    successCount++;
+  }catch(err){
+    console.warn('Falha ao sincronizar os favoritos (seguindo local só pra essa parte):', err);
+  }
+
   cloudEnabled = successCount > 0;
-  if(successCount === 3){
+
+  // Configurações compartilhadas (chave do TMDB) e vetos da noite.
+  // Não entram na contagem acima: se falharem, o resto segue normal.
+  try{
+    onSnapshot(configDocRef, (snap)=>{
+      if(snap.exists()){
+        const remoteKey = snap.data().tmdbKey || '';
+        if(remoteKey !== tmdbKey) setTmdbKey(remoteKey, false);
+      } else if(tmdbKey){
+        // Chave salva só neste aparelho (de antes da nuvem): sobe pra nuvem
+        setDoc(configDocRef, { tmdbKey }, { merge:true }).catch(()=>{});
+      }
+    }, (err)=> console.warn('Falha ao escutar as configurações:', err));
+    onSnapshot(sessaoDocRef, (snap)=>{
+      if(!snap.exists()) return;
+      sessao = snap.data() || {};
+      try{ localStorage.setItem(SESSAO_STORAGE_KEY, JSON.stringify(sessao)); }catch(e){}
+      renderVetoUi();
+      if(rouletteMode === 'watchlist') renderWatchlistRoulette();
+    }, (err)=> console.warn('Falha ao escutar os vetos:', err));
+  }catch(err){
+    console.warn('Falha ao sincronizar configurações/vetos:', err);
+  }
+
+  if(successCount === 4){
     setCloudStatus(iconHtml('cloud') + ' Sincronizado entre aparelhos', 'cloud-on');
   } else if(successCount > 0){
     setCloudStatus(iconHtml('cloud') + ' Sincronizado parcialmente — veja o console', 'cloud-off');
@@ -2591,4 +3689,7 @@ renderDiario();
 updateDiarioStats();
 renderWatchlist();
 updateWatchlistStats();
+renderFavorites();
+renderVetoUi();
+refreshTmdbUi();
 initCloudSync();

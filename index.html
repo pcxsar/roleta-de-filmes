@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
@@ -229,6 +229,42 @@
   <path d="M21 16h-4" />
   <path d="M11 3H9" />
 </symbol>
+<symbol id="i-plus" viewBox="0 0 24 24">
+  <path d="M5 12h14" />
+  <path d="M12 5v14" />
+</symbol>
+<symbol id="i-search" viewBox="0 0 24 24">
+  <path d="m21 21-4.34-4.34" />
+  <circle cx="11" cy="11" r="8" />
+</symbol>
+<symbol id="i-sort" viewBox="0 0 24 24">
+  <path d="m3 16 4 4 4-4" />
+  <path d="M7 20V4" />
+  <path d="M11 4h10" />
+  <path d="M11 8h7" />
+  <path d="M11 12h4" />
+</symbol>
+<symbol id="i-flame" viewBox="0 0 24 24">
+  <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" />
+</symbol>
+<symbol id="i-settings" viewBox="0 0 24 24">
+  <path d="M14 17H5" />
+  <path d="M19 7h-9" />
+  <circle cx="17" cy="17" r="3" />
+  <circle cx="7" cy="7" r="3" />
+</symbol>
+<symbol id="i-tv" viewBox="0 0 24 24">
+  <path d="m17 2-5 5-5-5" />
+  <rect width="20" height="15" x="2" y="7" rx="2" />
+</symbol>
+<symbol id="i-ban" viewBox="0 0 24 24">
+  <circle cx="12" cy="12" r="10" />
+  <path d="M4.929 4.929 19.07 19.071" />
+</symbol>
+<symbol id="i-rotate-ccw" viewBox="0 0 24 24">
+  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+  <path d="M3 3v5h5" />
+</symbol>
 <symbol id="i-x" viewBox="0 0 24 24">
   <path d="M18 6 6 18" />
   <path d="m6 6 12 12" />
@@ -250,28 +286,27 @@
 </div>
 
 <div class="bg-scrim"></div>
-<div class="aurora"><span></span><span></span><span></span></div>
-<div class="grain"></div>
-<div class="sparkles" id="sparkles"></div>
-
-<div class="top-flare"></div>
+<div class="aurora"><span></span><span></span></div>
 
 <header>
   <div class="hero-photo-wrap">
     <div class="hero-glow"></div>
     <img class="hero-photo" src="https://res.cloudinary.com/dam2gd3fj/image/upload/v1785766129/n%C3%B3s_tezcx6.png" alt="Paulo e Julia">
-    <div class="hero-particles" id="heroParticles"></div>
   </div>
-  <h1><span class="hero-title-sub">Nosso registro</span><br>de filmes</h1>
-
-  <div class="tabs" id="tabSwitcher">
-    <button class="tab-btn" data-tab="diario"><svg class="icon"><use href="#i-notebook-pen"/></svg> Diário</button>
-    <button class="tab-btn" data-tab="watchlist"><svg class="icon"><use href="#i-popcorn"/></svg> Ver</button>
-    <button class="tab-btn" data-tab="roleta"><svg class="icon"><use href="#i-dices"/></svg> Roleta</button>
-    <button class="tab-btn" data-tab="perfil"><svg class="icon"><use href="#i-users"/></svg> Nós</button>
+  <div class="hero-text">
+    <span class="hero-kicker">Paulo &amp; Julia</span>
+    <h1>Nosso registro de filmes</h1>
   </div>
-  <!-- <div class="cloud-status" id="cloudStatus">Conectando…</div> -->
+  <button type="button" class="settings-btn" id="settingsBtn" aria-label="Configurações"><svg class="icon"><use href="#i-settings"/></svg></button>
 </header>
+
+<!-- Navegação principal: barra flutuante embaixo, no alcance do polegar -->
+<nav class="bottom-nav" id="tabSwitcher" aria-label="Seções">
+  <button class="tab-btn" data-tab="diario"><svg class="icon"><use href="#i-notebook-pen"/></svg><span>Diário</span></button>
+  <button class="tab-btn" data-tab="watchlist"><svg class="icon"><use href="#i-popcorn"/></svg><span>Quero ver</span></button>
+  <button class="tab-btn" data-tab="roleta"><svg class="icon"><use href="#i-dices"/></svg><span>Roleta</span></button>
+  <button class="tab-btn" data-tab="perfil"><svg class="icon"><use href="#i-heart"/></svg><span>Nós</span></button>
+</nav>
 
 <main>
 
@@ -296,25 +331,26 @@
     <div class="list-head">
       <div class="list-head-top">
         <h2>Filmes assistidos</h2>
-        <div class="list-head-actions">
+        <button class="add-btn" id="addMovieBtn"><svg class="icon"><use href="#i-plus"/></svg> Novo filme</button>
+      </div>
+      <div class="reorder-hint" id="diarioReorderHint">Segure a alça <svg class="icon"><use href="#i-grip-vertical"/></svg> e arraste pra reordenar. A busca e os filtros ficam pausados enquanto isso.</div>
+      <div class="search-wrap" id="diarioSearchWrap">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input type="text" class="search" id="diarioSearch" placeholder="Buscar filme…">
+      </div>
+      <div class="toolbar">
+        <div class="toolbar-filters">
+          <div id="diarioSortRow"></div>
+          <div id="diarioGenreFilterRow"></div>
+        </div>
+        <div class="toolbar-actions">
           <div class="view-toggle" id="diarioViewToggle">
             <button class="view-toggle-btn active" data-view="list" aria-label="Ver como lista"><svg class="icon"><use href="#i-list"/></svg></button>
             <button class="view-toggle-btn" data-view="mural" aria-label="Ver como mural"><svg class="icon"><use href="#i-layout-grid"/></svg></button>
           </div>
-          <button class="reorder-btn" id="diarioReorderBtn"><svg class="icon"><use href="#i-arrow-up-down"/></svg> <span>Reorganizar</span></button>
-          <button class="add-btn" id="addMovieBtn">+ Novo filme</button>
+          <button class="reorder-btn" id="diarioReorderBtn" aria-label="Reorganizar"><svg class="icon"><use href="#i-arrow-up-down"/></svg> <span>Ordem</span></button>
         </div>
       </div>
-      <div class="reorder-hint" id="diarioReorderHint">Segure a alça <svg class="icon"><use href="#i-grip-vertical"/></svg> e arraste pra reordenar. A busca e os filtros ficam pausados enquanto isso.</div>
-      <input type="text" class="search" id="diarioSearch" placeholder="Buscar filme…">
-      <div class="chip-row" id="diarioSortRow">
-        <div class="toggle-chip active" data-sort="recent">Recentes</div>
-        <div class="toggle-chip" data-sort="oldest">Mais antigos</div>
-        <div class="toggle-chip" data-sort="best">Melhores notas</div>
-        <div class="toggle-chip" data-sort="worst">Piores notas</div>
-        <div class="toggle-chip" data-sort="custom">Personalizado</div>
-      </div>
-      <div id="diarioGenreFilterRow" style="margin-top:10px;"></div>
     </div>
     <div class="movie-grid" id="diarioGrid"></div>
     <div class="empty-state" id="diarioEmpty">Nenhum filme por aqui ainda. Bora adicionar o primeiro?</div>
@@ -323,29 +359,32 @@
 
 <!-- ==================== ABA: QUERO VER ==================== -->
 <section class="tab-panel" id="panel-watchlist" hidden>
-  <div class="stats-row" style="grid-template-columns:1fr; max-width:280px;">
-    <div class="stat-tile">
-      <div class="stat-num" id="wTotal">0</div>
-      <div class="stat-lbl">Na lista pra ver</div>
-    </div>
-  </div>
-
   <div class="list-section">
     <div class="list-head">
       <div class="list-head-top">
-        <h2>Quero ver</h2>
-        <div class="list-head-actions">
+        <div>
+          <h2>Quero ver</h2>
+          <div class="list-head-sub"><span id="wTotal">0</span> filmes guardados</div>
+        </div>
+        <button class="add-btn" id="addWatchlistBtn"><svg class="icon"><use href="#i-plus"/></svg> Adicionar</button>
+      </div>
+      <div class="reorder-hint" id="watchlistReorderHint">Segure a alça <svg class="icon"><use href="#i-grip-vertical"/></svg> e arraste pra reordenar. A busca e os filtros ficam pausados enquanto isso.</div>
+      <div class="search-wrap" id="watchlistSearchWrap">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input type="text" class="search" id="watchlistSearch" placeholder="Buscar filme…">
+      </div>
+      <div class="toolbar">
+        <div class="toolbar-filters">
+          <div id="watchlistGenreFilterRow"></div>
+        </div>
+        <div class="toolbar-actions">
           <div class="view-toggle" id="watchlistViewToggle">
             <button class="view-toggle-btn active" data-view="list" aria-label="Ver como lista"><svg class="icon"><use href="#i-list"/></svg></button>
             <button class="view-toggle-btn" data-view="mural" aria-label="Ver como mural"><svg class="icon"><use href="#i-layout-grid"/></svg></button>
           </div>
-          <button class="reorder-btn" id="watchlistReorderBtn"><svg class="icon"><use href="#i-arrow-up-down"/></svg> <span>Reorganizar</span></button>
-          <button class="add-btn" id="addWatchlistBtn">+ Adicionar</button>
+          <button class="reorder-btn" id="watchlistReorderBtn" aria-label="Reorganizar"><svg class="icon"><use href="#i-arrow-up-down"/></svg> <span>Ordem</span></button>
         </div>
       </div>
-      <div class="reorder-hint" id="watchlistReorderHint">Segure a alça <svg class="icon"><use href="#i-grip-vertical"/></svg> e arraste pra reordenar. A busca e os filtros ficam pausados enquanto isso.</div>
-      <input type="text" class="search" id="watchlistSearch" placeholder="Buscar filme…">
-      <div id="watchlistGenreFilterRow" style="margin-top:10px;"></div>
     </div>
     <div class="movie-grid" id="watchlistGrid"></div>
     <div class="empty-state" id="watchlistEmpty">Nada guardado ainda. Viu alguma indicação boa? Adiciona aqui pra não esquecer.</div>
@@ -360,17 +399,14 @@
   </div>
 
   <div id="oscarRouletteMode">
-  <div class="stats-row">
-    <div class="stat-tile">
-      <div class="stat-num" id="prog-total-num">56</div>
-      <div class="stat-lbl">Vencedores</div>
+  <div class="progress-card">
+    <div class="progress-card-top">
+      <div>
+        <div class="progress-card-lbl"><svg class="icon"><use href="#i-trophy"/></svg> Maratona do Oscar</div>
+        <div class="progress-card-num"><strong id="prog-count">0</strong> de <span id="prog-total-num">56</span> vencedores</div>
+      </div>
+      <div class="progress-card-pct" id="prog-pct">0%</div>
     </div>
-    <div class="stat-tile">
-      <div class="stat-num"><em class="accent-cyan" id="prog-count">0</em></div>
-      <div class="stat-lbl">Assistidos</div>
-    </div>
-  </div>
-  <div class="progress-wrap">
     <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
   </div>
 
@@ -400,22 +436,30 @@
         <div class="pending-hint" id="pendingHint" style="display:none;"><svg class="icon"><use href="#i-sparkles"/></svg> Vocês já viram tudo — sorteando entre todos de novo!</div>
       </div>
     </div>
+    <div class="veto-bar"></div>
 
     <div class="result" id="resultCard">
       <div class="r-year" id="rYear">—</div>
       <div class="r-title" id="rTitle">Gire para descobrir o filme da noite</div>
       <div class="r-tag" id="rTag"></div>
       <div class="r-media" id="rMedia"></div>
+      <div class="r-providers" id="rProviders"></div>
       <div class="r-actions" id="rActions" style="display:none;">
         <button class="r-btn mark-ok" id="rMark">Marcar como assistido</button>
       </div>
+      <div class="veto-row" id="rVeto"></div>
     </div>
   </div>
 
   <div class="list-section">
     <div class="list-head">
-      <h2>Vencedores desde 1970</h2>
-      <input type="text" class="search" id="searchInput" placeholder="Buscar filme ou ano…">
+      <div class="list-head-top">
+        <h2>Vencedores desde 1970</h2>
+      </div>
+      <div class="search-wrap">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input type="text" class="search" id="searchInput" placeholder="Buscar filme ou ano…">
+      </div>
       <div class="chip-row" id="decadeRow"></div>
       <div class="chip-row">
         <div class="toggle-chip" id="filterPending">Só pendentes</div>
@@ -429,38 +473,36 @@
 
   <div id="watchlistRouletteMode" hidden>
     <div class="profile-intro" style="margin-top:14px;">
-      <p>Escolha um ou mais gêneros (ou deixe todos) e gire entre os filmes que vocês guardaram pra ver.</p>
+      <p>Escolha um ou mais gêneros (ou deixe todos) e gire entre os filmes que vocês guardaram pra ver. Os que vocês marcaram com <svg class="icon flame-inline"><use href="#i-flame"/></svg> aparecem mais vezes e têm mais chance de sair.</p>
     </div>
     <div class="chip-row" id="wrGenreChips" style="max-width:640px; margin:10px auto 0; justify-content:center;"></div>
     <div class="pending-hint" id="wrPoolHint" style="text-align:center; margin-top:8px;"></div>
 
     <div id="wrHasItems">
       <div class="stage">
-        <div class="wheel-area">
-          <div class="wheel-halo" id="wrWheelHalo"></div>
-          <svg class="pointer" viewBox="0 0 34 38" fill="none">
-            <path d="M17 38L0 8H34L17 38Z" fill="url(#pg2)"/>
-            <defs><linearGradient id="pg2" x1="17" y1="8" x2="17" y2="38"><stop stop-color="#ffcc4d"/><stop offset="1" stop-color="#ff3fb0"/></linearGradient></defs>
-            <circle cx="17" cy="6" r="5" fill="#ffcc4d" stroke="#4c1d95" stroke-width="1.5"/>
-          </svg>
-          <div class="wheel-outer">
-            <div class="wheel-spin-wrap" id="wrWheelWrap">
-              <canvas id="wrWheelCanvas"></canvas>
-            </div>
+        <!-- Caça-níquel de pôsteres: a fileira passa e para no filme sorteado -->
+        <div class="slot-machine" id="slotMachine">
+          <div class="slot-bulbs top"></div>
+          <div class="slot-window">
+            <div class="slot-strip" id="slotStrip"></div>
           </div>
-          <div class="hub"></div>
+          <div class="slot-pointer"></div>
+          <div class="slot-bulbs bottom"></div>
         </div>
 
         <button class="spin-btn" id="wrSpinBtn">Girar</button>
+        <div class="veto-bar"></div>
 
         <div class="result" id="wrResultCard">
           <div class="r-year" id="wrGenreTag">—</div>
           <div class="r-title" id="wrTitle">Gire para descobrir o próximo filme</div>
           <div class="r-media" id="wrMedia"></div>
+          <div class="r-providers" id="wrProviders"></div>
           <div class="r-actions" id="wrActions" style="display:none;">
             <button class="r-btn mark-ok" id="wrMarkWatched"><svg class="icon"><use href="#i-check"/></svg> Já assisti</button>
             <button class="r-btn" id="wrSpinAgain"><svg class="icon"><use href="#i-dices"/></svg> Girar de novo</button>
           </div>
+          <div class="veto-row" id="wrVeto"></div>
         </div>
       </div>
     </div>
@@ -471,8 +513,23 @@
 <!-- ==================== ABA: NÓS (perfil do casal) ==================== -->
 <section class="tab-panel" id="panel-perfil" hidden>
   <div class="profile-intro">
-    <div class="profile-heart"><svg class="icon"><use href="#i-heart"/></svg></div>
     <p>O que a gente descobriu assistindo filme atrás de filme.</p>
+  </div>
+
+  <div class="fav-columns">
+    <div class="fav-section" data-who="julia">
+      <div class="fav-head">
+        <h2 class="profile-section-title"><span class="who-dot j"></span> Favoritos da Julia</h2>
+      </div>
+      <div class="fav-shelf" id="favShelfJulia"></div>
+    </div>
+
+    <div class="fav-section" data-who="paulo">
+      <div class="fav-head">
+        <h2 class="profile-section-title"><span class="who-dot p"></span> Favoritos do Paulo</h2>
+      </div>
+      <div class="fav-shelf" id="favShelfPaulo"></div>
+    </div>
   </div>
 
   <div class="stats-row stats-4">
@@ -495,7 +552,7 @@
   </div>
 
   <div class="profile-section">
-    <h2 class="profile-section-title"><svg class="icon"><use href="#i-trophy"/></svg> Top 5 melhores filmes</h2>
+    <h2 class="profile-section-title"><svg class="icon"><use href="#i-star"/></svg> Melhores notas</h2>
     <div class="profile-top-filter" id="profileTopFilter">
       <button class="mode-btn active" data-who="geral">Geral</button>
       <button class="mode-btn" data-who="paulo">Paulo</button>
@@ -509,7 +566,7 @@
     <div id="profileClashList"></div>
   </div>
 
-  <div class="profile-section" style="margin-bottom:60px;">
+  <div class="profile-section">
     <h2 class="profile-section-title"><svg class="icon"><use href="#i-clapperboard"/></svg> Filmes por gênero</h2>
     <div id="profileGenreBars"></div>
   </div>
@@ -534,7 +591,11 @@
       </div>
     </div>
 
-    <input type="text" class="search diario-title-input" id="diarioTitleInput" placeholder="Nome do filme">
+    <div class="suggest-wrap">
+      <input type="text" class="search diario-title-input" id="diarioTitleInput" placeholder="Nome do filme" autocomplete="off">
+      <div class="suggest-list" id="diarioSuggest"></div>
+    </div>
+    <div class="field-hint tmdb-hint"></div>
     <div class="dup-warning" id="diarioDupWarning" style="display:none;"><svg class="icon"><use href="#i-triangle-alert"/></svg> Esse filme já está no seu Diário.</div>
 
     <span class="field-label">Onde assistiram</span>
@@ -546,19 +607,22 @@
     <span class="field-label">Categoria</span>
     <div id="diarioGenreRow"></div>
 
-    <div class="rate-row" style="margin-top:18px;">
-      <label><span class="rate-dot p"></span>Nota do Paulo</label>
-      <div class="rate-input-wrap">
-        <input type="number" class="rate-input" id="diarioRatePaulo" min="0" max="10" step="0.5" placeholder="—">
-        <span class="rate-sub">/ 10</span>
-      </div>
-    </div>
-    <div class="rate-row">
-      <label><span class="rate-dot j"></span>Nota da Julia</label>
-      <div class="rate-input-wrap">
-        <input type="number" class="rate-input" id="diarioRateJulia" min="0" max="10" step="0.5" placeholder="—">
-        <span class="rate-sub">/ 10</span>
-      </div>
+    <span class="field-label">Notas</span>
+    <div class="rate-grid">
+      <label class="rate-card p">
+        <span class="rate-card-who"><span class="rate-dot p"></span>Paulo</span>
+        <span class="rate-input-wrap">
+          <input type="number" inputmode="decimal" class="rate-input" id="diarioRatePaulo" min="0" max="10" step="0.5" placeholder="—">
+          <span class="rate-sub">/10</span>
+        </span>
+      </label>
+      <label class="rate-card j">
+        <span class="rate-card-who"><span class="rate-dot j"></span>Julia</span>
+        <span class="rate-input-wrap">
+          <input type="number" inputmode="decimal" class="rate-input" id="diarioRateJulia" min="0" max="10" step="0.5" placeholder="—">
+          <span class="rate-sub">/10</span>
+        </span>
+      </label>
     </div>
 
     <span class="field-label">O que vocês acharam</span>
@@ -588,11 +652,22 @@
       </div>
     </div>
 
-    <input type="text" class="search diario-title-input" id="watchlistTitleInput" placeholder="Nome do filme">
+    <div class="suggest-wrap">
+      <input type="text" class="search diario-title-input" id="watchlistTitleInput" placeholder="Nome do filme" autocomplete="off">
+      <div class="suggest-list" id="watchlistSuggest"></div>
+    </div>
+    <div class="field-hint tmdb-hint"></div>
     <div class="dup-warning" id="watchlistDupWarning" style="display:none;"><svg class="icon"><use href="#i-triangle-alert"/></svg> Esse filme já está na sua lista.</div>
 
     <span class="field-label">Categoria</span>
     <div id="watchlistGenreRow"></div>
+
+    <span class="field-label">Quem quer muito ver?</span>
+    <div class="hype-row">
+      <button type="button" class="hype-toggle p" id="watchlistWantPaulo"><svg class="icon"><use href="#i-flame"/></svg> Paulo</button>
+      <button type="button" class="hype-toggle j" id="watchlistWantJulia"><svg class="icon"><use href="#i-flame"/></svg> Julia</button>
+    </div>
+    <div class="field-hint">Cada <svg class="icon flame-inline"><use href="#i-flame"/></svg> aumenta a chance do filme sair na roleta "Nossa lista".</div>
 
     <span class="field-label">Sobre o que é / por que quer ver</span>
     <textarea class="diario-textarea" id="watchlistDescInput" rows="4" placeholder="Do que se trata, onde viu a indicação…"></textarea>
@@ -605,17 +680,58 @@
   </div>
 </div>
 
+<!-- ==================== MODAL: escolher/editar um favorito ==================== -->
+<div class="modal-overlay" id="favModalOverlay">
+  <div class="modal-card">
+    <div class="modal-close" id="favModalClose"><svg class="icon"><use href="#i-x"/></svg></div>
+    <div class="modal-eyebrow" id="favModalEyebrow">Favorito</div>
+
+    <div class="poster-upload">
+      <div class="poster-upload-preview" id="favPosterPreview"><div class="r-poster-placeholder"><svg class="icon"><use href="#i-star"/></svg></div></div>
+      <div class="poster-upload-actions">
+        <label class="poster-upload-btn">
+          <svg class="icon"><use href="#i-camera"/></svg> Trocar capa
+          <input type="file" accept="image/*" id="favPosterFile" hidden>
+        </label>
+        <button type="button" class="poster-upload-clear" id="favPosterClear" style="display:none;">remover capa enviada</button>
+      </div>
+    </div>
+
+    <div class="suggest-wrap">
+      <input type="text" class="search diario-title-input" id="favTitleInput" placeholder="Nome do filme" autocomplete="off">
+      <div class="suggest-list" id="favSuggest"></div>
+    </div>
+    <div class="field-hint">Comece a digitar: aparecem os filmes do Diário e, com o TMDB ativado, qualquer filme.</div>
+
+    <span class="field-label">Por que é favorito</span>
+    <textarea class="diario-textarea" id="favDescInput" rows="4" placeholder="O que esse filme tem de especial…"></textarea>
+
+    <div class="modal-actions">
+      <button class="modal-save" id="favModalSave">Salvar favorito</button>
+      <button class="modal-remove" id="favModalRemove" style="display:none;">Tirar dos favoritos</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== TELA DE LEITURA DO FILME ==================== -->
 <div class="modal-overlay" id="movieViewOverlay">
   <div class="modal-card view-card">
     <div class="modal-close" id="movieViewClose"><svg class="icon"><use href="#i-x"/></svg></div>
 
-    <div class="view-photo" id="movieViewPhoto"></div>
+    <div class="view-hero">
+      <div class="view-backdrop" id="movieViewBackdrop"></div>
+      <div class="view-hero-inner">
+        <div class="view-photo" id="movieViewPhoto"></div>
+        <div class="view-hero-text">
+          <div class="view-eyebrow" id="movieViewEyebrow"></div>
+          <h2 class="view-title" id="movieViewTitle"></h2>
+          <div class="view-meta" id="movieViewMeta"></div>
+        </div>
+      </div>
+    </div>
 
     <div class="view-body">
       <div class="view-genres" id="movieViewGenres"></div>
-      <h2 class="view-title" id="movieViewTitle"></h2>
-      <div class="view-meta" id="movieViewMeta"></div>
 
       <div class="view-rating" id="movieViewRating" style="display:none;">
         <div class="view-rating-item">
@@ -635,10 +751,62 @@
         <p id="movieViewObsText"></p>
       </div>
 
+      <div class="view-section" id="movieViewOverviewSection" style="display:none;">
+        <h3><svg class="icon"><use href="#i-clapperboard"/></svg> Sinopse</h3>
+        <p id="movieViewOverviewText"></p>
+      </div>
+
+      <div class="view-section" id="movieViewProvidersSection" style="display:none;">
+        <h3><svg class="icon"><use href="#i-tv"/></svg> Onde assistir</h3>
+        <div id="movieViewProviders"></div>
+      </div>
+
       <div class="modal-actions">
-        <button class="modal-mark-watched" id="movieViewMarkWatchedBtn" style="display:none;"><svg class="icon"><use href="#i-check"/></svg> Já assisti — mover pro Diário</button>
+        <button class="modal-mark-watched" id="movieViewMarkWatchedBtn" style="display:none;"><svg class="icon"><use href="#i-check"/></svg> Já assisti</button>
         <button class="modal-save view-edit-btn" id="movieViewEditBtn"><svg class="icon"><use href="#i-pencil"/></svg> Editar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CONFIGURAÇÕES ==================== -->
+<div class="modal-overlay" id="settingsOverlay">
+  <div class="modal-card">
+    <div class="modal-close" id="settingsClose"><svg class="icon"><use href="#i-x"/></svg></div>
+    <div class="modal-eyebrow">Configurações</div>
+
+    <div class="settings-block">
+      <div class="settings-head">
+        <div>
+          <h3 class="settings-title">Busca automática (TMDB)</h3>
+          <p class="settings-desc">Sugere o filme certo enquanto vocês digitam, com capa, ano, sinopse e onde assistir.</p>
+        </div>
+        <span class="settings-status" id="tmdbStatus"></span>
+      </div>
+
+      <ol class="settings-steps" id="tmdbSteps">
+        <li>Crie uma conta grátis em <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener">themoviedb.org</a>.</li>
+        <li>Vá em <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">Configurações → API</a> e peça uma chave (uso pessoal).</li>
+        <li>Copie o <strong>Token de leitura da API</strong> (o texto longo) e cole aqui embaixo.</li>
+      </ol>
+
+      <div class="settings-key-row">
+        <input type="password" class="search" id="tmdbKeyInput" placeholder="Cole a chave ou o token do TMDB" autocomplete="off" spellcheck="false">
+        <button type="button" class="settings-save" id="tmdbKeySave">Salvar</button>
+      </div>
+      <div class="settings-msg" id="tmdbMsg"></div>
+      <button type="button" class="modal-remove" id="tmdbKeyRemove" style="display:none;">Desconectar o TMDB</button>
+      <p class="settings-note">A chave fica guardada na nuvem do app e vale pros dois aparelhos.</p>
+    </div>
+
+    <div class="settings-block">
+      <label class="settings-switch-row">
+        <span>
+          <span class="settings-title">Sons</span>
+          <span class="settings-desc">Tique-taque da roleta e o "plim" ao salvar.</span>
+        </span>
+        <span class="pending-toggle"><input type="checkbox" id="soundToggle"></span>
+      </label>
     </div>
   </div>
 </div>
@@ -647,8 +815,9 @@
 
 <footer>
   Feito para Paulo &amp; Julia <span class="heart">♥</span> — filme por filme, sessão por sessão.
+  <div class="footer-credits">Capas, sinopses e onde assistir: <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a> e JustWatch. Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.</div>
 </footer>
 
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=16"></script>
 </body>
 </html>
