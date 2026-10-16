@@ -169,6 +169,35 @@ function formatNum(n){
   const rounded = Math.round(n*100)/100;
   return String(rounded).replace('.', ',');
 }
+/* Aviso com "Desfazer" (remover/mover filme). Some sozinho em 6s;
+   só um por vez — um novo substitui o anterior (que fica valendo). */
+let undoToastTimer = null;
+function showUndoToast(message, onUndo){
+  let el = document.getElementById('undoToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'undoToast';
+    el.className = 'undo-toast';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `
+    <span class="undo-msg">${escapeHtml(message)}</span>
+    <button type="button" class="undo-btn">${iconHtml('rotate-ccw')} Desfazer</button>
+    <span class="undo-progress"></span>`;
+  const hide = ()=>{ el.classList.remove('show'); clearTimeout(undoToastTimer); };
+  el.querySelector('.undo-btn').addEventListener('click', ()=>{
+    hide();
+    playClick();
+    onUndo();
+  }, { once: true });
+  clearTimeout(undoToastTimer);
+  el.classList.remove('show');
+  void el.offsetWidth; // reinicia a barrinha de tempo
+  el.classList.add('show');
+  undoToastTimer = setTimeout(hide, 6000);
+}
+
 // Dados mínimos pra buscar capa/sinopse de um registro do Diário/Watchlist
 function lookupOf(e){
   return { id: e.id, t: e.title, y: e.year || '', tmdbId: e.tmdbId || null };
@@ -1754,6 +1783,7 @@ function updateDiarioStats(){
   const avgJ = jRatings.length ? jRatings.reduce((a,b)=>a+b,0)/jRatings.length : null;
   document.getElementById('dAvgPaulo').textContent = formatNum(avgP);
   document.getElementById('dAvgJulia').textContent = formatNum(avgJ);
+  renderHome();
 }
 
 const diarioSortDropdown = createOptionDropdown(document.getElementById('diarioSortRow'), {
@@ -2000,7 +2030,14 @@ diarioModalSave.addEventListener('click', ()=>{
   }
 
   if(finishedConvertingId){
-    removeWatchlistEntry(finishedConvertingId);
+    const moved = removeWatchlistEntry(finishedConvertingId);
+    const createdId = entryId;
+    if(moved){
+      showUndoToast(`"${title}" foi pro Diário`, ()=>{
+        removeDiarioEntry(createdId);
+        restoreWatchlistEntry(moved);
+      });
+    }
   }
 
   // Filme do Oscar avaliado por aqui: mantém a Roleta em sincronia
@@ -2016,31 +2053,60 @@ diarioModalSave.addEventListener('click', ()=>{
   }
 });
 
-diarioModalRemove.addEventListener('click', ()=>{
-  if(!diarioEditId) return;
-  const removedId = diarioEditId;
+// Tira um filme do Diário (e, se for do Oscar, da contagem da roleta).
+// Devolve o que foi removido, pra dar pra desfazer.
+function removeDiarioEntry(removedId){
   const removedEntry = diario.find(e => e.id === removedId);
-  const removedOscarId = removedEntry ? (removedEntry.oscarId ?? null) : null;
+  if(!removedEntry) return null;
+  const removedOscarId = removedEntry.oscarId ?? null;
+  const oscarData = removedOscarId != null && data[removedOscarId] ? { ...data[removedOscarId] } : null;
   diario = diario.filter(e => e.id !== removedId);
-  delete wikiCache[removedId];
-  saveWikiCache();
   saveDiarioLocal();
-  closeDiarioModal();
   renderDiario();
   updateDiarioStats();
 
   if(cloudEnabled){
     deleteDoc(doc(diarioColRef, removedId)).catch(err => logCloudError('Falha ao remover filme no servidor', err));
   }
-
   if(removedOscarId != null){
     delete data[removedOscarId];
     saveData(removedOscarId);
-    renderGrid();
-    updateProgress();
-    if(currentPick && currentPick.id === removedOscarId){
-      showResult(MOVIES.findIndex(m => m.id === removedOscarId), {withMedia:false});
-    }
+    refreshOscarAfterChange(removedOscarId);
+  }
+  return { entry: { ...removedEntry }, oscarData };
+}
+
+function restoreDiarioEntry(removed){
+  const { entry, oscarData } = removed;
+  diario = diario.filter(e => e.id !== entry.id).concat([entry]);
+  saveDiarioLocal();
+  renderDiario();
+  updateDiarioStats();
+  if(cloudEnabled){
+    const { id, ...rest } = entry;
+    setDoc(doc(diarioColRef, id), rest).catch(err => logCloudError('Falha ao restaurar filme do diário', err));
+  }
+  if(entry.oscarId != null && oscarData){
+    data[entry.oscarId] = oscarData;
+    saveData(entry.oscarId);
+    refreshOscarAfterChange(entry.oscarId);
+  }
+}
+
+function refreshOscarAfterChange(oscarId){
+  renderGrid();
+  updateProgress();
+  if(currentPick && currentPick.id === oscarId){
+    showResult(MOVIES.findIndex(m => m.id === oscarId), {withMedia:false});
+  }
+}
+
+diarioModalRemove.addEventListener('click', ()=>{
+  if(!diarioEditId) return;
+  const removed = removeDiarioEntry(diarioEditId);
+  closeDiarioModal();
+  if(removed){
+    showUndoToast(`"${removed.entry.title}" saiu do Diário`, ()=> restoreDiarioEntry(removed));
   }
 });
 
@@ -2366,22 +2432,37 @@ watchlistModalSave.addEventListener('click', ()=>{
   }
 });
 
+// Devolve uma cópia do item removido (pra dar pra desfazer)
 function removeWatchlistEntry(id){
+  const removed = watchlist.find(e => e.id === id);
   watchlist = watchlist.filter(e => e.id !== id);
-  delete wikiCache[id];
-  saveWikiCache();
   saveWatchlistLocal();
   renderWatchlist();
   updateWatchlistStats();
   if(cloudEnabled){
     deleteDoc(doc(watchlistColRef, id)).catch(err => logCloudError('Falha ao remover item no servidor', err));
   }
+  return removed ? { ...removed } : null;
+}
+
+function restoreWatchlistEntry(entry){
+  watchlist = watchlist.filter(e => e.id !== entry.id).concat([entry]);
+  saveWatchlistLocal();
+  renderWatchlist();
+  updateWatchlistStats();
+  if(cloudEnabled){
+    const { id, ...rest } = entry;
+    setDoc(doc(watchlistColRef, id), rest).catch(err => logCloudError('Falha ao restaurar item da watchlist', err));
+  }
 }
 
 watchlistModalRemove.addEventListener('click', ()=>{
   if(!watchlistEditId) return;
-  removeWatchlistEntry(watchlistEditId);
+  const removed = removeWatchlistEntry(watchlistEditId);
   closeWatchlistModal();
+  if(removed){
+    showUndoToast(`"${removed.title}" saiu da lista`, ()=> restoreWatchlistEntry(removed));
+  }
 });
 
 watchlistMarkWatched.addEventListener('click', ()=>{
@@ -2565,14 +2646,14 @@ function animateViewClose(back){
 // Aquece a cor da capa assim que o dedo encosta no card (o clique vem
 // ~100ms depois), pra tela já abrir na cor certa sem repintar no meio.
 document.addEventListener('pointerdown', (ev)=>{
-  const poster = ev.target.closest && ev.target.closest('.movie-card, .mural-card, .fav-slot');
+  const poster = ev.target.closest && ev.target.closest('.movie-card, .mural-card, .fav-slot, .home-last');
   const src = loadedImgSrc(originPosterOf(poster));
   if(src) posterColor(src);
 }, { passive: true });
 
 function originPosterOf(el){
   if(!el) return null;
-  return el.matches('.m-poster, .mural-poster, .fav-poster') ? el : el.querySelector('.m-poster, .mural-poster, .fav-poster');
+  return el.matches('.m-poster, .mural-poster, .fav-poster, .home-last-poster') ? el : el.querySelector('.m-poster, .mural-poster, .fav-poster, .home-last-poster');
 }
 function loadedImgSrc(posterEl){
   const img = posterEl && posterEl.querySelector('img');
@@ -2721,6 +2802,8 @@ document.addEventListener('keydown', (e)=>{
   if(movieViewOverlay.classList.contains('open')) closeMovieView();
   if(favModalOverlay.classList.contains('open')) closeFavModal();
   if(settingsOverlay.classList.contains('open')) closeSettings();
+  if(memoryOverlay.classList.contains('open')) closeMemory();
+  if(addChooserOverlay.classList.contains('open')) closeAddChooser();
 });
 
 /* =====================================================
@@ -3406,14 +3489,25 @@ favModalRemove.addEventListener('click', ()=>{
   if(!favEditing) return;
   const { who, slot } = favEditing;
   const id = favId(who, slot);
+  const removed = findFavorite(who, slot);
   favoritos = favoritos.filter(f => !(f.who === who && f.slot === slot));
-  delete wikiCache[id];
-  saveWikiCache();
   saveFavoritosLocal();
   closeFavModal();
   renderFavorites();
   if(cloudEnabled){
     deleteDoc(doc(favoritosColRef, id)).catch(err => logCloudError('Falha ao remover favorito no servidor', err));
+  }
+  if(removed){
+    const copy = { ...removed };
+    showUndoToast(`"${copy.title}" saiu dos favoritos`, ()=>{
+      favoritos = favoritos.filter(f => !(f.who === who && f.slot === slot)).concat([copy]);
+      saveFavoritosLocal();
+      renderFavorites();
+      if(cloudEnabled){
+        const { id: docId, ...rest } = copy;
+        setDoc(doc(favoritosColRef, docId), rest).catch(err => logCloudError('Falha ao restaurar favorito', err));
+      }
+    });
   }
 });
 
@@ -3489,6 +3583,7 @@ function animateNumberTo(el, target){
 
 function renderProfile(){
   renderFavorites();
+  renderProfileExtras();
   const stats = computeProfileStats();
 
   animateNumberTo(document.getElementById('pTotal'), stats.total);
@@ -3601,10 +3696,22 @@ const panels = {
 const ACTIVE_TAB_KEY = 'oscar-roleta-active-tab';
 let activeTab = localStorage.getItem(ACTIVE_TAB_KEY) || 'diario';
 
+const TAB_ORDER = ['diario', 'watchlist', 'roleta', 'perfil'];
+const TAB_LABELS = { diario:'Diário', watchlist:'Quero ver', roleta:'Roleta', perfil:'Nós' };
+
 function setActiveTab(tab){
+  const prev = activeTab;
   activeTab = tab;
   tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  Object.entries(panels).forEach(([name, el]) => { el.hidden = name !== tab; });
+  // A aba nova entra pelo lado de onde veio (dá a sensação de "deslizar")
+  const dir = TAB_ORDER.indexOf(tab) >= TAB_ORDER.indexOf(prev) ? 'from-right' : 'from-left';
+  Object.entries(panels).forEach(([name, el]) => {
+    el.hidden = name !== tab;
+    el.classList.remove('from-right', 'from-left');
+    if(name === tab && prev && prev !== tab) el.classList.add(dir);
+  });
+  const topTitle = document.getElementById('topBarTitle');
+  if(topTitle) topTitle.textContent = TAB_LABELS[tab] || '';
   localStorage.setItem(ACTIVE_TAB_KEY, tab);
   if(tab !== 'roleta'){ fabSpin.classList.remove('visible'); }
   else {
@@ -3616,16 +3723,468 @@ function setActiveTab(tab){
   }
   if(tab === 'perfil'){ renderProfile(); }
 }
-tabBtns.forEach(b => b.addEventListener('click', ()=>{
-  playClick();
-  const changed = b.dataset.tab !== activeTab;
-  setActiveTab(b.dataset.tab);
+function goToTab(tab){
+  const changed = tab !== activeTab;
+  setActiveTab(tab);
   // Cada aba começa do topo (a navegação fica fixa embaixo, então sem
   // isso a aba nova abriria no meio da rolagem da anterior).
   if(changed) window.scrollTo({ top: 0, behavior: 'instant' });
+}
+tabBtns.forEach(b => b.addEventListener('click', ()=>{
+  playClick();
+  goToTab(b.dataset.tab);
 }));
+// (a aba inicial é aberta lá no fim, na inicialização — depois de todo o
+// código carregado, senão abrir direto em "Nós" quebrava o app)
 
-setActiveTab(activeTab);
+/* =====================================================
+   Deslizar pros lados troca de aba (celular). Ignora gestos que
+   começam em coisas que já usam o arraste: campos, roletas,
+   carrosséis, alças de reordenar e janelas abertas.
+===================================================== */
+(function initSwipeTabs(){
+  let start = null;
+  const IGNORE = 'input, textarea, select, button.drag-handle, .drag-handle, .genre-dropdown, .slot-machine, .wheel-area, .wrapped-track, .rating-chart, .bottom-nav, .reorder-item';
+  document.addEventListener('touchstart', (e)=>{
+    start = null;
+    if(e.touches.length !== 1) return;
+    if(document.querySelector('.modal-overlay.open')) return;
+    if(diarioReorderMode || watchlistReorderMode) return;
+    if(e.target.closest && e.target.closest(IGNORE)) return;
+    const t = e.touches[0];
+    start = { x: t.clientX, y: t.clientY, at: Date.now() };
+  }, { passive: true });
+  document.addEventListener('touchend', (e)=>{
+    if(!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const quick = Date.now() - start.at < 650;
+    start = null;
+    if(!quick || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+    const idx = TAB_ORDER.indexOf(activeTab);
+    const next = TAB_ORDER[idx + (dx < 0 ? 1 : -1)];
+    if(!next) return;
+    if(navigator.vibrate) navigator.vibrate(8);
+    goToTab(next);
+  }, { passive: true });
+})();
+
+/* =====================================================
+   Cabeçalho que encolhe: quando o cabeçalho grande sai da tela,
+   uma barra fina (foto pequena + nome da aba) aparece no topo.
+===================================================== */
+(function initTopBar(){
+  const bar = document.getElementById('topBar');
+  const header = document.querySelector('header');
+  if(!bar || !header) return;
+  let ticking = false;
+  const update = ()=>{
+    ticking = false;
+    const show = window.scrollY > header.offsetTop + header.offsetHeight - 12;
+    bar.classList.toggle('show', show);
+    bar.setAttribute('aria-hidden', show ? 'false' : 'true');
+  };
+  window.addEventListener('scroll', ()=>{
+    if(!ticking){ ticking = true; requestAnimationFrame(update); }
+  }, { passive: true });
+  update();
+})();
+
+/* =====================================================
+   TELA INICIAL — saudação + último filme em destaque
+===================================================== */
+function greetingNow(){
+  const h = new Date().getHours();
+  if(h >= 5 && h < 12) return 'Bom dia';
+  if(h >= 12 && h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+function homeLineNow(){
+  const d = new Date();
+  const day = d.getDay(); // 0 dom … 6 sáb
+  const h = d.getHours();
+  if((day === 5 || day === 6) && (h >= 17 || h < 4)) return 'Noite perfeita pra um filminho. O que vai ser hoje?';
+  if(day === 0) return 'Domingo pede sofá, pipoca e um bom filme.';
+  if(h >= 5 && h < 12) return 'Já pensaram no filme de hoje à noite?';
+  return 'O que vamos assistir hoje?';
+}
+function lastWatched(){
+  if(!diario.length) return null;
+  return diario.reduce((a, b) => ((b.addedAt || 0) > (a.addedAt || 0) ? b : a));
+}
+
+let homeLastEntry = null;
+function renderHome(){
+  const hero = document.getElementById('homeHero');
+  if(!hero) return;
+  document.getElementById('homeGreeting').textContent = greetingNow();
+  document.getElementById('homeLine').textContent = homeLineNow();
+
+  const last = lastWatched();
+  const card = document.getElementById('homeLast');
+  const bg = document.getElementById('homeHeroBg');
+  const posterEl = document.getElementById('homeLastPoster');
+  card.hidden = !last;
+  if(!last){ bg.style.backgroundImage = ''; clearTint(hero); homeLastEntry = null; return; }
+
+  const sameEntry = homeLastEntry && homeLastEntry.id === last.id && homeLastEntry.poster === last.poster;
+  homeLastEntry = last;
+  document.getElementById('homeLastTitle').textContent = last.title;
+  const media = computeMedia(last);
+  const meta = [];
+  if(media != null) meta.push(`<span class="home-last-media">${iconHtml('star')} ${formatNum(media)}</span>`);
+  if(last.notaPaulo != null) meta.push(`<span><span class="rate-dot p"></span>${formatNum(last.notaPaulo)}</span>`);
+  if(last.notaJulia != null) meta.push(`<span><span class="rate-dot j"></span>${formatNum(last.notaJulia)}</span>`);
+  if(last.where) meta.push(`<span>${iconHtml(last.where === 'Cinema' ? 'clapperboard' : 'sofa')} ${escapeHtml(last.where)}</span>`);
+  document.getElementById('homeLastMeta').innerHTML = meta.join('');
+
+  if(sameEntry) return; // capa e cor já estão certas
+  const show = (src)=>{
+    if(homeLastEntry !== last) return;
+    posterEl.innerHTML = src ? `<img src="${src}" alt="" onerror="handlePosterError(this)">` : posterPlaceholderHTML;
+    bg.style.backgroundImage = src ? `url("${src}")` : '';
+    applyTint(hero, src);
+  };
+  if(last.poster){ show(last.poster); return; }
+  posterEl.innerHTML = '<div class="skeleton-poster"></div>';
+  getMovieInfo(lookupOf(last))
+    .then(info => show(info && info.found ? info.image : null))
+    .catch(()=> show(null));
+}
+
+document.getElementById('homeLast').addEventListener('click', ()=>{
+  if(homeLastEntry) openMovieView(homeLastEntry, 'diario', document.getElementById('homeLastPoster'));
+});
+document.getElementById('homeSpinBtn').addEventListener('click', ()=>{
+  playClick();
+  goToTab('roleta');
+});
+
+// "Adicionar": pergunta se já viram (Diário) ou se querem ver (lista)
+const addChooserOverlay = document.getElementById('addChooserOverlay');
+function closeAddChooser(){ addChooserOverlay.classList.remove('open'); }
+document.getElementById('homeAddBtn').addEventListener('click', ()=>{
+  playClick();
+  addChooserOverlay.classList.add('open');
+});
+document.getElementById('addChooserClose').addEventListener('click', closeAddChooser);
+addChooserOverlay.addEventListener('click', (e)=>{ if(e.target === addChooserOverlay) closeAddChooser(); });
+document.getElementById('addChoiceDiario').addEventListener('click', ()=>{
+  closeAddChooser();
+  openDiarioModal(null);
+});
+document.getElementById('addChoiceWatchlist').addEventListener('click', ()=>{
+  closeAddChooser();
+  openWatchlistModal(null);
+});
+
+/* =====================================================
+   NESTE DIA — lembra um filme registrado há 1 mês ou há N anos,
+   num pop-up, no máximo uma vez por dia. (Abrir o site com
+   ?neste-dia mostra uma prévia com o último filme, pra testar.)
+===================================================== */
+const MEMORY_DAY_KEY = 'cinema-pj-memory-day';
+const memoryOverlay = document.getElementById('memoryOverlay');
+let memoryEntry = null;
+let memoryChecked = false;
+
+function findMemory(){
+  const now = new Date();
+  const found = [];
+  diario.forEach(e=>{
+    if(!e.addedAt || e.addedAt < 1.5e12) return; // registros antigos sem data real
+    const d = new Date(e.addedAt);
+    if(d.getDate() !== now.getDate()) return;
+    const months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+    if(months === 1) found.push({ e, months, label: 'há 1 mês' });
+    else if(months >= 12 && months % 12 === 0){
+      const y = months / 12;
+      found.push({ e, months, label: y === 1 ? 'há 1 ano' : `há ${y} anos` });
+    }
+  });
+  // Lembrança de anos tem prioridade; entre iguais, a mais bem avaliada
+  found.sort((a, b) => (b.months - a.months) || ((computeMedia(b.e) ?? 0) - (computeMedia(a.e) ?? 0)));
+  return found[0] || null;
+}
+
+function todayKey(){
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+
+function showMemory(memory, preview){
+  memoryEntry = memory.e;
+  const e = memory.e;
+  document.getElementById('memoryKicker').textContent = preview ? 'Neste dia (prévia)' : `Neste dia, ${memory.label}`;
+  document.getElementById('memoryTitle').textContent = e.title;
+  const meta = [];
+  if(e.notaPaulo != null) meta.push(`<span><span class="rate-dot p"></span>Paulo ${formatNum(e.notaPaulo)}</span>`);
+  if(e.notaJulia != null) meta.push(`<span><span class="rate-dot j"></span>Julia ${formatNum(e.notaJulia)}</span>`);
+  if(e.where) meta.push(`<span>${iconHtml(e.where === 'Cinema' ? 'clapperboard' : 'sofa')} ${escapeHtml(e.where)}</span>`);
+  document.getElementById('memoryMeta').innerHTML = meta.join('');
+  const quote = document.getElementById('memoryQuote');
+  quote.textContent = e.obs ? `“${truncate(e.obs, 160)}”` : 'Vocês assistiram esse juntos. Que tal relembrar?';
+  const posterEl = document.getElementById('memoryPoster');
+  const card = memoryOverlay.querySelector('.memory-card');
+  const show = (src)=>{
+    posterEl.innerHTML = src ? `<img src="${src}" alt="">` : posterPlaceholderHTML;
+    applyTint(card, src);
+  };
+  if(e.poster) show(e.poster);
+  else {
+    posterEl.innerHTML = '<div class="skeleton-poster"></div>';
+    getMovieInfo(lookupOf(e)).then(info => show(info && info.found ? info.image : null)).catch(()=> show(null));
+  }
+  memoryOverlay.classList.add('open');
+  if(!preview){ try{ localStorage.setItem(MEMORY_DAY_KEY, todayKey()); }catch(err){} }
+}
+function closeMemory(){ memoryOverlay.classList.remove('open'); }
+
+// Chamado quando os dados do Diário chegam (nuvem ou local). Espera a
+// abertura (splash) sumir e nenhuma outra janela estar aberta.
+function maybeShowMemory(){
+  if(memoryChecked) return;
+  memoryChecked = true;
+  const preview = new URLSearchParams(location.search).has('neste-dia');
+  let shownToday = false;
+  try{ shownToday = localStorage.getItem(MEMORY_DAY_KEY) === todayKey(); }catch(err){}
+  if(shownToday && !preview) return;
+  const memory = findMemory() || (preview && lastWatched() ? { e: lastWatched(), label: '' } : null);
+  if(!memory) return;
+  const tryShow = (attempt)=>{
+    const busy = document.getElementById('splashScreen') || document.querySelector('.modal-overlay.open');
+    if(busy){ if(attempt < 40) setTimeout(()=> tryShow(attempt + 1), 500); return; }
+    showMemory(memory, preview && !findMemory());
+  };
+  setTimeout(()=> tryShow(0), 600);
+}
+
+document.getElementById('memoryClose').addEventListener('click', closeMemory);
+document.getElementById('memoryDismiss').addEventListener('click', closeMemory);
+memoryOverlay.addEventListener('click', (e)=>{ if(e.target === memoryOverlay) closeMemory(); });
+document.getElementById('memoryOpen').addEventListener('click', ()=>{
+  const entry = memoryEntry;
+  closeMemory();
+  if(entry) setTimeout(()=> openMovieView(entry, 'diario'), 120);
+});
+
+/* =====================================================
+   NÓS — capa do perfil, gráfico de notas e retrospectiva
+===================================================== */
+const MONTHS_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const REAL_DATE_MIN = 1.5e12; // registros antigos (da planilha) não têm data real
+
+function renderProfileExtras(){
+  // "Juntos desde…" pelo primeiro registro com data de verdade
+  const dated = diario.filter(e => (e.addedAt || 0) > REAL_DATE_MIN).sort((a,b) => a.addedAt - b.addedAt);
+  const since = document.getElementById('profileSince');
+  if(dated.length){
+    const d = new Date(dated[0].addedAt);
+    since.textContent = `Registrando filme por filme desde ${MONTHS_PT[d.getMonth()]} de ${d.getFullYear()}.`;
+  }
+  // Fundo da capa: mosaico desfocado das capas dos favoritos/melhores
+  const bg = document.getElementById('profileBannerBg');
+  const posters = favoritos.map(favoritePoster).concat(diario.filter(e => e.poster && computeMedia(e) >= 9).map(e => e.poster)).filter(Boolean).slice(0, 4);
+  bg.innerHTML = posters.map(src => `<span style="background-image:url('${src.replace(/'/g, '%27')}')"></span>`).join('');
+  bg.classList.toggle('has-posters', posters.length > 0);
+
+  renderRatingChart();
+  renderWrapped();
+}
+
+/* Gráfico de linha: nota do Paulo e da Julia em cada filme, na ordem
+   em que foram registrados. SVG desenhado à mão, com cursor + dica. */
+const CHART_COLORS = { p:'#c48614', j:'#e84a98' }; // validados p/ o fundo escuro (contraste e daltonismo)
+
+function renderRatingChart(){
+  const el = document.getElementById('ratingChart');
+  const list = diario.slice().sort((a,b) => (a.addedAt||0) - (b.addedAt||0))
+    .filter(e => e.notaPaulo != null || e.notaJulia != null);
+  if(list.length < 2){
+    el.innerHTML = '<div class="profile-empty">Avaliem pelo menos dois filmes pra ver a linha do tempo.</div>';
+    return;
+  }
+  const W = Math.max(280, el.clientWidth || 340);
+  const H = 210;
+  const pad = { l: 28, r: 10, t: 12, b: 26 };
+  const n = list.length;
+  const x = i => pad.l + (n === 1 ? 0 : i * (W - pad.l - pad.r) / (n - 1));
+  const y = v => pad.t + (10 - v) / 10 * (H - pad.t - pad.b);
+
+  // linha com "buracos" onde alguém não deu nota
+  const pathFor = key => {
+    let d = '', pen = false;
+    list.forEach((e, i)=>{
+      const v = e[key];
+      if(v == null){ pen = false; return; }
+      d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+      pen = true;
+    });
+    return d;
+  };
+  const lastIdx = key => { for(let i = n - 1; i >= 0; i--) if(list[i][key] != null) return i; return -1; };
+  const endDot = (key, color) => {
+    const i = lastIdx(key);
+    return i < 0 ? '' : `<circle cx="${x(i)}" cy="${y(list[i][key])}" r="4" fill="${color}" stroke="#0d0b18" stroke-width="2"/>`;
+  };
+  const grid = [0, 5, 10].map(v => `
+    <line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" class="chart-grid"/>
+    <text x="${pad.l - 8}" y="${y(v) + 4}" class="chart-tick" text-anchor="end">${v}</text>`).join('');
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Notas de Paulo e Julia em ${n} filmes, do primeiro ao mais recente">
+      ${grid}
+      <text x="${pad.l}" y="${H - 6}" class="chart-tick">primeiro</text>
+      <text x="${W - pad.r}" y="${H - 6}" class="chart-tick" text-anchor="end">mais recente</text>
+      <path d="${pathFor('notaPaulo')}" fill="none" stroke="${CHART_COLORS.p}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${pathFor('notaJulia')}" fill="none" stroke="${CHART_COLORS.j}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${endDot('notaPaulo', CHART_COLORS.p)}
+      ${endDot('notaJulia', CHART_COLORS.j)}
+      <g class="chart-hover" visibility="hidden">
+        <line class="chart-crosshair" y1="${pad.t}" y2="${H - pad.b}"/>
+        <circle class="chart-hp" r="5" fill="${CHART_COLORS.p}" stroke="#0d0b18" stroke-width="2"/>
+        <circle class="chart-hj" r="5" fill="${CHART_COLORS.j}" stroke="#0d0b18" stroke-width="2"/>
+      </g>
+      <rect class="chart-hit" x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+    </svg>
+    <div class="chart-tip" hidden></div>
+    <table class="sr-only">
+      <caption>Notas por filme</caption>
+      <tr><th>Filme</th><th>Paulo</th><th>Julia</th></tr>
+      ${list.map(e => `<tr><td>${escapeHtml(e.title)}</td><td>${formatNum(e.notaPaulo)}</td><td>${formatNum(e.notaJulia)}</td></tr>`).join('')}
+    </table>`;
+
+  const svg = el.querySelector('svg');
+  const hover = svg.querySelector('.chart-hover');
+  const cross = svg.querySelector('.chart-crosshair');
+  const hp = svg.querySelector('.chart-hp');
+  const hj = svg.querySelector('.chart-hj');
+  const tip = el.querySelector('.chart-tip');
+  const showAt = (clientX)=>{
+    const r = svg.getBoundingClientRect();
+    const px = (clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - pad.l) / ((W - pad.l - pad.r) / (n - 1)))));
+    const e = list[i];
+    const cx = x(i);
+    cross.setAttribute('x1', cx); cross.setAttribute('x2', cx);
+    hp.setAttribute('visibility', e.notaPaulo != null ? 'visible' : 'hidden');
+    hj.setAttribute('visibility', e.notaJulia != null ? 'visible' : 'hidden');
+    if(e.notaPaulo != null){ hp.setAttribute('cx', cx); hp.setAttribute('cy', y(e.notaPaulo)); }
+    if(e.notaJulia != null){ hj.setAttribute('cx', cx); hj.setAttribute('cy', y(e.notaJulia)); }
+    hover.setAttribute('visibility', 'visible');
+    tip.innerHTML = `<strong>${escapeHtml(e.title)}</strong>
+      <span><i class="chart-swatch p"></i>Paulo ${formatNum(e.notaPaulo)}</span>
+      <span><i class="chart-swatch j"></i>Julia ${formatNum(e.notaJulia)}</span>`;
+    tip.hidden = false;
+    const left = (cx / W) * r.width;
+    tip.style.left = Math.max(70, Math.min(r.width - 70, left)) + 'px';
+  };
+  const hide = ()=>{ hover.setAttribute('visibility', 'hidden'); tip.hidden = true; };
+  svg.addEventListener('pointermove', (ev)=> showAt(ev.clientX));
+  svg.addEventListener('pointerdown', (ev)=> showAt(ev.clientX));
+  svg.addEventListener('pointerleave', (ev)=>{ if(ev.pointerType === 'mouse') hide(); });
+}
+window.addEventListener('resize', ()=>{ if(activeTab === 'perfil') renderRatingChart(); });
+
+/* Retrospectiva do ano: cartões estilo "Wrapped" num carrossel */
+function renderWrapped(){
+  const year = new Date().getFullYear();
+  document.getElementById('wrappedTitle').textContent = `Retrospectiva ${year}`;
+  const el = document.getElementById('profileWrapped');
+  const items = diario.filter(e => (e.addedAt || 0) > REAL_DATE_MIN && new Date(e.addedAt).getFullYear() === year);
+  if(!items.length){
+    el.innerHTML = `<div class="profile-empty">A retrospectiva de ${year} aparece assim que vocês registrarem filmes este ano.</div>`;
+    return;
+  }
+  const cinema = items.filter(e => e.where === 'Cinema').length;
+  const casa = items.filter(e => e.where === 'Casa').length;
+  const rated = items.map(e => ({ e, m: computeMedia(e) })).filter(x => x.m != null).sort((a,b) => b.m - a.m);
+  const best = rated[0];
+  const worst = rated.length > 1 ? rated[rated.length - 1] : null;
+
+  const byMonth = {};
+  items.forEach(e => { const m = new Date(e.addedAt).getMonth(); byMonth[m] = (byMonth[m] || 0) + 1; });
+  const topMonth = Object.entries(byMonth).sort((a,b) => b[1] - a[1])[0];
+
+  const genreCount = {};
+  items.forEach(e => entryGenres(e).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }));
+  const topGenreEntry = Object.entries(genreCount).sort((a,b) => b[1] - a[1])[0];
+  const topGenre = topGenreEntry ? genreById(topGenreEntry[0]) : null;
+
+  const clash = items.filter(e => e.notaPaulo != null && e.notaJulia != null)
+    .map(e => ({ e, gap: Math.abs(e.notaPaulo - e.notaJulia) })).sort((a,b) => b.gap - a.gap)[0];
+  const tensP = items.filter(e => e.notaPaulo === 10).length;
+  const tensJ = items.filter(e => e.notaJulia === 10).length;
+
+  const posterOf = e => e.poster ? `<img src="${e.poster}" alt="">` : '';
+  const cards = [];
+  cards.push(`
+    <div class="wrapped-card w-total">
+      <span class="w-kicker">${year} em filmes</span>
+      <strong class="w-big">${items.length}</strong>
+      <span class="w-label">filme${items.length === 1 ? '' : 's'} juntos</span>
+      <span class="w-foot">${cinema} no cinema · ${casa} em casa</span>
+    </div>`);
+  if(best) cards.push(`
+    <div class="wrapped-card w-best">
+      <span class="w-kicker">O melhor do ano</span>
+      <div class="w-poster">${posterOf(best.e)}</div>
+      <strong class="w-title">${escapeHtml(best.e.title)}</strong>
+      <span class="w-foot">${iconHtml('star')} ${formatNum(best.m)} de média</span>
+    </div>`);
+  if(topGenre) cards.push(`
+    <div class="wrapped-card w-genre" style="--g:${topGenre.color}">
+      <span class="w-kicker">O gênero de vocês</span>
+      <span class="w-icon">${iconHtml(topGenre.icon)}</span>
+      <strong class="w-title">${escapeHtml(topGenre.label)}</strong>
+      <span class="w-foot">${topGenreEntry[1]} filme${topGenreEntry[1] === 1 ? '' : 's'} este ano</span>
+    </div>`);
+  if(topMonth) cards.push(`
+    <div class="wrapped-card w-month">
+      <span class="w-kicker">Mês mais cinéfilo</span>
+      <strong class="w-big w-cap">${MONTHS_PT[+topMonth[0]]}</strong>
+      <span class="w-foot">${topMonth[1]} filme${topMonth[1] === 1 ? '' : 's'} num mês só</span>
+    </div>`);
+  if(clash && clash.gap > 0) cards.push(`
+    <div class="wrapped-card w-clash">
+      <span class="w-kicker">A maior discórdia</span>
+      <strong class="w-title">${escapeHtml(clash.e.title)}</strong>
+      <span class="w-vs"><span><i class="rate-dot p"></i>${formatNum(clash.e.notaPaulo)}</span><em>vs</em><span><i class="rate-dot j"></i>${formatNum(clash.e.notaJulia)}</span></span>
+      <span class="w-foot">${formatNum(clash.gap)} pontos de diferença</span>
+    </div>`);
+  cards.push(`
+    <div class="wrapped-card w-tens">
+      <span class="w-kicker">Notas 10</span>
+      <span class="w-vs big"><span><i class="rate-dot p"></i>${tensP}</span><em>×</em><span><i class="rate-dot j"></i>${tensJ}</span></span>
+      <span class="w-foot">${tensP === tensJ ? 'Empatados na empolgação' : (tensP > tensJ ? 'Paulo se empolgou mais' : 'Julia se empolgou mais')}</span>
+    </div>`);
+  if(worst && worst.m < (best ? best.m : 10)) cards.push(`
+    <div class="wrapped-card w-worst">
+      <span class="w-kicker">Esse não desceu</span>
+      <strong class="w-title">${escapeHtml(worst.e.title)}</strong>
+      <span class="w-foot">${formatNum(worst.m)} de média</span>
+    </div>`);
+
+  el.innerHTML = `<div class="wrapped-track">${cards.join('')}</div>`;
+
+  // Capa do "melhor do ano" sem capa enviada: busca automática
+  const bestPoster = el.querySelector('.w-best .w-poster');
+  if(best && bestPoster && !best.e.poster){
+    getMovieInfo(lookupOf(best.e)).then(info=>{
+      if(info && info.found && info.image) bestPoster.innerHTML = `<img src="${info.image}" alt="" onerror="this.remove()">`;
+    }).catch(()=>{});
+  }
+}
+
+/* =====================================================
+   Capas que surgem suavemente: toda imagem de capa começa
+   transparente e ganha .is-loaded quando termina de carregar.
+===================================================== */
+document.addEventListener('load', (e)=>{
+  const t = e.target;
+  if(t && t.tagName === 'IMG') t.classList.add('is-loaded');
+}, true);
 
 /* =====================================================
    Sincronização em nuvem (Firestore)
@@ -3666,6 +4225,7 @@ function logCloudError(action, err){
 async function initCloudSync(){
   if(OFFLINE_MODE){
     console.info('Modo offline (?offline): nuvem desligada, nada é sincronizado.');
+    maybeShowMemory();
     return;
   }
   try{
@@ -3679,6 +4239,7 @@ async function initCloudSync(){
     console.warn('Falha na autenticação com o Firebase, usando modo local.', err);
     cloudEnabled = false;
     setCloudStatus(iconHtml('cloud-off') + ' Modo local (só neste aparelho)', 'cloud-off');
+    maybeShowMemory();
     return;
   }
 
@@ -3723,10 +4284,12 @@ async function initCloudSync(){
       try{ localStorage.setItem(DIARIO_STORAGE_KEY, JSON.stringify(diario)); }catch(e){}
       renderDiario();
       updateDiarioStats();
+      maybeShowMemory();
     });
     successCount++;
   }catch(err){
     console.warn('Falha ao sincronizar o diário (seguindo local só pra essa parte):', err);
+    maybeShowMemory();
   }
 
   try{
@@ -3808,4 +4371,7 @@ updateWatchlistStats();
 renderFavorites();
 renderVetoUi();
 refreshTmdbUi();
+// Abre a última aba usada. Protegido: um erro de desenho numa aba nunca
+// pode impedir a sincronização com a nuvem logo abaixo.
+try{ setActiveTab(activeTab); }catch(err){ console.error('Falha ao abrir a aba inicial:', err); }
 initCloudSync();

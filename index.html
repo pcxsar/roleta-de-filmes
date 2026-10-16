@@ -17,8 +17,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=18">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 
@@ -244,6 +244,20 @@
   <path d="M11 8h7" />
   <path d="M11 12h4" />
 </symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24">
+  <path d="m9 18 6-6-6-6" />
+</symbol>
+<symbol id="i-trending" viewBox="0 0 24 24">
+  <path d="M16 7h6v6" />
+  <path d="m22 7-8.5 8.5-5-5L2 17" />
+</symbol>
+<symbol id="i-calendar-heart" viewBox="0 0 24 24">
+  <path d="M12.127 22H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5.125" />
+  <path d="M14.62 18.8A2.25 2.25 0 1 1 18 15.836a2.25 2.25 0 1 1 3.38 2.966l-2.626 2.856a.998.998 0 0 1-1.507 0z" />
+  <path d="M16 2v4" />
+  <path d="M3 10h18" />
+  <path d="M8 2v4" />
+</symbol>
 <symbol id="i-flame" viewBox="0 0 24 24">
   <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" />
 </symbol>
@@ -300,6 +314,16 @@
   <button type="button" class="settings-btn" id="settingsBtn" aria-label="Configurações"><svg class="icon"><use href="#i-settings"/></svg></button>
 </header>
 
+<!-- Cabeçalho compacto: aparece quando o cabeçalho grande sai da tela -->
+<div class="top-bar" id="topBar" aria-hidden="true">
+  <img class="top-bar-photo" src="https://res.cloudinary.com/dam2gd3fj/image/upload/v1785766129/n%C3%B3s_tezcx6.png" alt="">
+  <div class="top-bar-text">
+    <span class="top-bar-kicker">Paulo &amp; Julia</span>
+    <span class="top-bar-title" id="topBarTitle">Diário</span>
+  </div>
+  <button type="button" class="top-bar-btn" data-open-settings aria-label="Configurações" tabindex="-1"><svg class="icon"><use href="#i-settings"/></svg></button>
+</div>
+
 <!-- Navegação principal: barra flutuante embaixo, no alcance do polegar -->
 <nav class="bottom-nav" id="tabSwitcher" aria-label="Seções">
   <button class="tab-btn" data-tab="diario"><svg class="icon"><use href="#i-notebook-pen"/></svg><span>Diário</span></button>
@@ -312,18 +336,33 @@
 
 <!-- ==================== ABA: DIÁRIO ==================== -->
 <section class="tab-panel" id="panel-diario">
-  <div class="stats-row stats-3">
-    <div class="stat-tile">
-      <div class="stat-num accent-cyan" id="dTotal">0</div>
-      <div class="stat-lbl">Assistidos</div>
-    </div>
-    <div class="stat-tile">
-      <div class="stat-num accent-gold" id="dAvgPaulo">—</div>
-      <div class="stat-lbl">Média Paulo</div>
-    </div>
-    <div class="stat-tile">
-      <div class="stat-num accent-magenta" id="dAvgJulia">—</div>
-      <div class="stat-lbl">Média Julia</div>
+  <!-- Tela inicial: saudação + último filme em destaque -->
+  <div class="home-hero" id="homeHero">
+    <div class="home-hero-bg" id="homeHeroBg"></div>
+    <div class="home-hero-inner">
+      <p class="home-greet"><span id="homeGreeting">Boa noite</span>, <em>Paulo &amp; Julia</em></p>
+      <p class="home-line" id="homeLine"></p>
+
+      <button type="button" class="home-last" id="homeLast">
+        <span class="home-last-poster" id="homeLastPoster"></span>
+        <span class="home-last-text">
+          <span class="home-last-kicker">Último filme que vocês viram</span>
+          <span class="home-last-title" id="homeLastTitle"></span>
+          <span class="home-last-meta" id="homeLastMeta"></span>
+        </span>
+        <svg class="icon home-last-chevron"><use href="#i-chevron-right"/></svg>
+      </button>
+
+      <div class="home-actions">
+        <button type="button" class="home-btn primary" id="homeSpinBtn"><svg class="icon"><use href="#i-dices"/></svg> Girar roleta</button>
+        <button type="button" class="home-btn" id="homeAddBtn"><svg class="icon"><use href="#i-plus"/></svg> Adicionar</button>
+      </div>
+
+      <div class="home-stats">
+        <span><strong id="dTotal">0</strong> filmes juntos</span>
+        <span><span class="rate-dot p"></span>Paulo <strong id="dAvgPaulo">—</strong></span>
+        <span><span class="rate-dot j"></span>Julia <strong id="dAvgJulia">—</strong></span>
+      </div>
     </div>
   </div>
 
@@ -512,8 +551,22 @@
 
 <!-- ==================== ABA: NÓS (perfil do casal) ==================== -->
 <section class="tab-panel" id="panel-perfil" hidden>
-  <div class="profile-intro">
-    <p>O que a gente descobriu assistindo filme atrás de filme.</p>
+  <!-- Capa do perfil do casal -->
+  <div class="profile-banner">
+    <div class="profile-banner-bg" id="profileBannerBg"></div>
+    <div class="profile-banner-inner">
+      <div class="profile-avatar-wrap">
+        <img class="profile-avatar" src="https://res.cloudinary.com/dam2gd3fj/image/upload/v1785766129/n%C3%B3s_tezcx6.png" alt="Paulo e Julia">
+      </div>
+      <h2 class="profile-name">Paulo <em>&amp;</em> Julia</h2>
+      <p class="profile-since" id="profileSince">O que a gente descobriu assistindo filme atrás de filme.</p>
+      <div class="profile-stats">
+        <div class="profile-stat"><strong id="pTotal">0</strong><span>filmes juntos</span></div>
+        <div class="profile-stat"><strong id="pAvg">—</strong><span>média do casal</span></div>
+        <div class="profile-stat"><strong id="pTopGenre">—</strong><span>gênero favorito</span></div>
+        <div class="profile-stat"><strong id="pCritico">—</strong><span>mais crítico(a)</span></div>
+      </div>
+    </div>
   </div>
 
   <div class="fav-columns">
@@ -532,23 +585,19 @@
     </div>
   </div>
 
-  <div class="stats-row stats-4">
-    <div class="stat-tile">
-      <div class="stat-num accent-cyan" id="pTotal">0</div>
-      <div class="stat-lbl">Filmes juntos</div>
+  <div class="profile-section">
+    <h2 class="profile-section-title"><svg class="icon"><use href="#i-sparkles"/></svg> <span id="wrappedTitle">Retrospectiva</span></h2>
+    <div id="profileWrapped"></div>
+  </div>
+
+  <div class="profile-section">
+    <h2 class="profile-section-title"><svg class="icon"><use href="#i-trending"/></svg> Notas ao longo do tempo</h2>
+    <p class="chart-sub">Cada ponto é um filme, do primeiro registrado ao mais recente. Toque no gráfico pra ver qual é.</p>
+    <div class="chart-legend">
+      <span class="chart-key p"><span class="chart-swatch"></span>Paulo</span>
+      <span class="chart-key j"><span class="chart-swatch"></span>Julia</span>
     </div>
-    <div class="stat-tile">
-      <div class="stat-num accent-violet" id="pAvg">—</div>
-      <div class="stat-lbl">Média do casal</div>
-    </div>
-    <div class="stat-tile">
-      <div class="stat-num" id="pTopGenre">—</div>
-      <div class="stat-lbl">Gênero favorito</div>
-    </div>
-    <div class="stat-tile">
-      <div class="stat-num" id="pCritico">—</div>
-      <div class="stat-lbl">Mais crítico(a)</div>
-    </div>
+    <div class="rating-chart" id="ratingChart"></div>
   </div>
 
   <div class="profile-section">
@@ -769,6 +818,42 @@
   </div>
 </div>
 
+<!-- ==================== NESTE DIA (lembrança) ==================== -->
+<div class="modal-overlay" id="memoryOverlay">
+  <div class="modal-card memory-card">
+    <div class="modal-close" id="memoryClose"><svg class="icon"><use href="#i-x"/></svg></div>
+    <div class="memory-kicker"><svg class="icon"><use href="#i-calendar-heart"/></svg> <span id="memoryKicker">Neste dia</span></div>
+    <div class="memory-body">
+      <div class="memory-poster" id="memoryPoster"></div>
+      <div class="memory-text">
+        <h3 class="memory-title" id="memoryTitle"></h3>
+        <div class="memory-meta" id="memoryMeta"></div>
+        <p class="memory-quote" id="memoryQuote"></p>
+      </div>
+    </div>
+    <div class="modal-actions memory-actions">
+      <button class="modal-save" id="memoryOpen">Relembrar o filme</button>
+      <button class="modal-remove" id="memoryDismiss">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ADICIONAR (escolha) ==================== -->
+<div class="modal-overlay" id="addChooserOverlay">
+  <div class="modal-card add-chooser">
+    <div class="modal-close" id="addChooserClose"><svg class="icon"><use href="#i-x"/></svg></div>
+    <div class="modal-eyebrow">Adicionar filme</div>
+    <button type="button" class="add-choice" id="addChoiceDiario">
+      <span class="add-choice-icon"><svg class="icon"><use href="#i-notebook-pen"/></svg></span>
+      <span class="add-choice-text"><strong>Já assistimos</strong><span>Registrar no Diário, com notas e resenha</span></span>
+    </button>
+    <button type="button" class="add-choice" id="addChoiceWatchlist">
+      <span class="add-choice-icon"><svg class="icon"><use href="#i-popcorn"/></svg></span>
+      <span class="add-choice-text"><strong>Quero ver</strong><span>Guardar na lista pra uma próxima sessão</span></span>
+    </button>
+  </div>
+</div>
+
 <!-- ==================== CONFIGURAÇÕES ==================== -->
 <div class="modal-overlay" id="settingsOverlay">
   <div class="modal-card">
@@ -818,6 +903,6 @@
   <div class="footer-credits">Capas, sinopses e onde assistir: <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a> e JustWatch. Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.</div>
 </footer>
 
-<script type="module" src="app.js?v=18"></script>
+<script type="module" src="app.js?v=21"></script>
 </body>
 </html>
