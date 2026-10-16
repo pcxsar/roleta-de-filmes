@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -336,40 +336,13 @@
 
 <!-- ==================== ABA: DIÁRIO ==================== -->
 <section class="tab-panel" id="panel-diario">
-  <!-- Tela inicial: saudação + último filme em destaque -->
-  <div class="home-hero" id="homeHero">
-    <div class="home-hero-bg" id="homeHeroBg"></div>
-    <div class="home-hero-inner">
-      <p class="home-greet"><span id="homeGreeting">Boa noite</span>, <em>Paulo &amp; Julia</em></p>
-      <p class="home-line" id="homeLine"></p>
-
-      <button type="button" class="home-last" id="homeLast">
-        <span class="home-last-poster" id="homeLastPoster"></span>
-        <span class="home-last-text">
-          <span class="home-last-kicker">Último filme que vocês viram</span>
-          <span class="home-last-title" id="homeLastTitle"></span>
-          <span class="home-last-meta" id="homeLastMeta"></span>
-        </span>
-        <svg class="icon home-last-chevron"><use href="#i-chevron-right"/></svg>
-      </button>
-
-      <div class="home-actions">
-        <button type="button" class="home-btn primary" id="homeSpinBtn"><svg class="icon"><use href="#i-dices"/></svg> Girar roleta</button>
-        <button type="button" class="home-btn" id="homeAddBtn"><svg class="icon"><use href="#i-plus"/></svg> Adicionar</button>
-      </div>
-
-      <div class="home-stats">
-        <span><strong id="dTotal">0</strong> filmes juntos</span>
-        <span><span class="rate-dot p"></span>Paulo <strong id="dAvgPaulo">—</strong></span>
-        <span><span class="rate-dot j"></span>Julia <strong id="dAvgJulia">—</strong></span>
-      </div>
-    </div>
-  </div>
-
   <div class="list-section">
     <div class="list-head">
       <div class="list-head-top">
-        <h2>Filmes assistidos</h2>
+        <div>
+          <h2>Filmes assistidos</h2>
+          <div class="list-head-sub"><span id="dTotal">0</span> filmes · Paulo <span id="dAvgPaulo">—</span> · Julia <span id="dAvgJulia">—</span></div>
+        </div>
         <button class="add-btn" id="addMovieBtn"><svg class="icon"><use href="#i-plus"/></svg> Novo filme</button>
       </div>
       <div class="reorder-hint" id="diarioReorderHint">Segure a alça <svg class="icon"><use href="#i-grip-vertical"/></svg> e arraste pra reordenar. A busca e os filtros ficam pausados enquanto isso.</div>
@@ -591,16 +564,6 @@
   </div>
 
   <div class="profile-section">
-    <h2 class="profile-section-title"><svg class="icon"><use href="#i-trending"/></svg> Notas ao longo do tempo</h2>
-    <p class="chart-sub">Cada ponto é um filme, do primeiro registrado ao mais recente. Toque no gráfico pra ver qual é.</p>
-    <div class="chart-legend">
-      <span class="chart-key p"><span class="chart-swatch"></span>Paulo</span>
-      <span class="chart-key j"><span class="chart-swatch"></span>Julia</span>
-    </div>
-    <div class="rating-chart" id="ratingChart"></div>
-  </div>
-
-  <div class="profile-section">
     <h2 class="profile-section-title"><svg class="icon"><use href="#i-star"/></svg> Melhores notas</h2>
     <div class="profile-top-filter" id="profileTopFilter">
       <button class="mode-btn active" data-who="geral">Geral</button>
@@ -613,6 +576,16 @@
   <div class="profile-section">
     <h2 class="profile-section-title"><svg class="icon"><use href="#i-scale"/></svg> Onde mais discordamos</h2>
     <div id="profileClashList"></div>
+  </div>
+
+  <div class="profile-section">
+    <h2 class="profile-section-title"><svg class="icon"><use href="#i-trending"/></svg> Notas ao longo do tempo</h2>
+    <p class="chart-sub">Cada ponto é um filme, do primeiro registrado ao mais recente. Toque no gráfico pra ver qual é.</p>
+    <div class="chart-legend">
+      <span class="chart-key p"><span class="chart-swatch"></span>Paulo</span>
+      <span class="chart-key j"><span class="chart-swatch"></span>Julia</span>
+    </div>
+    <div class="rating-chart" id="ratingChart"></div>
   </div>
 
   <div class="profile-section">
@@ -838,22 +811,6 @@
   </div>
 </div>
 
-<!-- ==================== ADICIONAR (escolha) ==================== -->
-<div class="modal-overlay" id="addChooserOverlay">
-  <div class="modal-card add-chooser">
-    <div class="modal-close" id="addChooserClose"><svg class="icon"><use href="#i-x"/></svg></div>
-    <div class="modal-eyebrow">Adicionar filme</div>
-    <button type="button" class="add-choice" id="addChoiceDiario">
-      <span class="add-choice-icon"><svg class="icon"><use href="#i-notebook-pen"/></svg></span>
-      <span class="add-choice-text"><strong>Já assistimos</strong><span>Registrar no Diário, com notas e resenha</span></span>
-    </button>
-    <button type="button" class="add-choice" id="addChoiceWatchlist">
-      <span class="add-choice-icon"><svg class="icon"><use href="#i-popcorn"/></svg></span>
-      <span class="add-choice-text"><strong>Quero ver</strong><span>Guardar na lista pra uma próxima sessão</span></span>
-    </button>
-  </div>
-</div>
-
 <!-- ==================== CONFIGURAÇÕES ==================== -->
 <div class="modal-overlay" id="settingsOverlay">
   <div class="modal-card">
@@ -903,6 +860,6 @@
   <div class="footer-credits">Capas, sinopses e onde assistir: <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a> e JustWatch. Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.</div>
 </footer>
 
-<script type="module" src="app.js?v=21"></script>
+<script type="module" src="app.js?v=22"></script>
 </body>
 </html>

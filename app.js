@@ -1783,7 +1783,6 @@ function updateDiarioStats(){
   const avgJ = jRatings.length ? jRatings.reduce((a,b)=>a+b,0)/jRatings.length : null;
   document.getElementById('dAvgPaulo').textContent = formatNum(avgP);
   document.getElementById('dAvgJulia').textContent = formatNum(avgJ);
-  renderHome();
 }
 
 const diarioSortDropdown = createOptionDropdown(document.getElementById('diarioSortRow'), {
@@ -2646,14 +2645,14 @@ function animateViewClose(back){
 // Aquece a cor da capa assim que o dedo encosta no card (o clique vem
 // ~100ms depois), pra tela já abrir na cor certa sem repintar no meio.
 document.addEventListener('pointerdown', (ev)=>{
-  const poster = ev.target.closest && ev.target.closest('.movie-card, .mural-card, .fav-slot, .home-last');
+  const poster = ev.target.closest && ev.target.closest('.movie-card, .mural-card, .fav-slot');
   const src = loadedImgSrc(originPosterOf(poster));
   if(src) posterColor(src);
 }, { passive: true });
 
 function originPosterOf(el){
   if(!el) return null;
-  return el.matches('.m-poster, .mural-poster, .fav-poster, .home-last-poster') ? el : el.querySelector('.m-poster, .mural-poster, .fav-poster, .home-last-poster');
+  return el.matches('.m-poster, .mural-poster, .fav-poster') ? el : el.querySelector('.m-poster, .mural-poster, .fav-poster');
 }
 function loadedImgSrc(posterEl){
   const img = posterEl && posterEl.querySelector('img');
@@ -2803,7 +2802,6 @@ document.addEventListener('keydown', (e)=>{
   if(favModalOverlay.classList.contains('open')) closeFavModal();
   if(settingsOverlay.classList.contains('open')) closeSettings();
   if(memoryOverlay.classList.contains('open')) closeMemory();
-  if(addChooserOverlay.classList.contains('open')) closeAddChooser();
 });
 
 /* =====================================================
@@ -3792,94 +3790,6 @@ tabBtns.forEach(b => b.addEventListener('click', ()=>{
 })();
 
 /* =====================================================
-   TELA INICIAL — saudação + último filme em destaque
-===================================================== */
-function greetingNow(){
-  const h = new Date().getHours();
-  if(h >= 5 && h < 12) return 'Bom dia';
-  if(h >= 12 && h < 18) return 'Boa tarde';
-  return 'Boa noite';
-}
-function homeLineNow(){
-  const d = new Date();
-  const day = d.getDay(); // 0 dom … 6 sáb
-  const h = d.getHours();
-  if((day === 5 || day === 6) && (h >= 17 || h < 4)) return 'Noite perfeita pra um filminho. O que vai ser hoje?';
-  if(day === 0) return 'Domingo pede sofá, pipoca e um bom filme.';
-  if(h >= 5 && h < 12) return 'Já pensaram no filme de hoje à noite?';
-  return 'O que vamos assistir hoje?';
-}
-function lastWatched(){
-  if(!diario.length) return null;
-  return diario.reduce((a, b) => ((b.addedAt || 0) > (a.addedAt || 0) ? b : a));
-}
-
-let homeLastEntry = null;
-function renderHome(){
-  const hero = document.getElementById('homeHero');
-  if(!hero) return;
-  document.getElementById('homeGreeting').textContent = greetingNow();
-  document.getElementById('homeLine').textContent = homeLineNow();
-
-  const last = lastWatched();
-  const card = document.getElementById('homeLast');
-  const bg = document.getElementById('homeHeroBg');
-  const posterEl = document.getElementById('homeLastPoster');
-  card.hidden = !last;
-  if(!last){ bg.style.backgroundImage = ''; clearTint(hero); homeLastEntry = null; return; }
-
-  const sameEntry = homeLastEntry && homeLastEntry.id === last.id && homeLastEntry.poster === last.poster;
-  homeLastEntry = last;
-  document.getElementById('homeLastTitle').textContent = last.title;
-  const media = computeMedia(last);
-  const meta = [];
-  if(media != null) meta.push(`<span class="home-last-media">${iconHtml('star')} ${formatNum(media)}</span>`);
-  if(last.notaPaulo != null) meta.push(`<span><span class="rate-dot p"></span>${formatNum(last.notaPaulo)}</span>`);
-  if(last.notaJulia != null) meta.push(`<span><span class="rate-dot j"></span>${formatNum(last.notaJulia)}</span>`);
-  if(last.where) meta.push(`<span>${iconHtml(last.where === 'Cinema' ? 'clapperboard' : 'sofa')} ${escapeHtml(last.where)}</span>`);
-  document.getElementById('homeLastMeta').innerHTML = meta.join('');
-
-  if(sameEntry) return; // capa e cor já estão certas
-  const show = (src)=>{
-    if(homeLastEntry !== last) return;
-    posterEl.innerHTML = src ? `<img src="${src}" alt="" onerror="handlePosterError(this)">` : posterPlaceholderHTML;
-    bg.style.backgroundImage = src ? `url("${src}")` : '';
-    applyTint(hero, src);
-  };
-  if(last.poster){ show(last.poster); return; }
-  posterEl.innerHTML = '<div class="skeleton-poster"></div>';
-  getMovieInfo(lookupOf(last))
-    .then(info => show(info && info.found ? info.image : null))
-    .catch(()=> show(null));
-}
-
-document.getElementById('homeLast').addEventListener('click', ()=>{
-  if(homeLastEntry) openMovieView(homeLastEntry, 'diario', document.getElementById('homeLastPoster'));
-});
-document.getElementById('homeSpinBtn').addEventListener('click', ()=>{
-  playClick();
-  goToTab('roleta');
-});
-
-// "Adicionar": pergunta se já viram (Diário) ou se querem ver (lista)
-const addChooserOverlay = document.getElementById('addChooserOverlay');
-function closeAddChooser(){ addChooserOverlay.classList.remove('open'); }
-document.getElementById('homeAddBtn').addEventListener('click', ()=>{
-  playClick();
-  addChooserOverlay.classList.add('open');
-});
-document.getElementById('addChooserClose').addEventListener('click', closeAddChooser);
-addChooserOverlay.addEventListener('click', (e)=>{ if(e.target === addChooserOverlay) closeAddChooser(); });
-document.getElementById('addChoiceDiario').addEventListener('click', ()=>{
-  closeAddChooser();
-  openDiarioModal(null);
-});
-document.getElementById('addChoiceWatchlist').addEventListener('click', ()=>{
-  closeAddChooser();
-  openWatchlistModal(null);
-});
-
-/* =====================================================
    NESTE DIA — lembra um filme registrado há 1 mês ou há N anos,
    num pop-up, no máximo uma vez por dia. (Abrir o site com
    ?neste-dia mostra uma prévia com o último filme, pra testar.)
@@ -3906,6 +3816,11 @@ function findMemory(){
   // Lembrança de anos tem prioridade; entre iguais, a mais bem avaliada
   found.sort((a, b) => (b.months - a.months) || ((computeMedia(b.e) ?? 0) - (computeMedia(a.e) ?? 0)));
   return found[0] || null;
+}
+
+function lastWatched(){
+  if(!diario.length) return null;
+  return diario.reduce((a, b) => ((b.addedAt || 0) > (a.addedAt || 0) ? b : a));
 }
 
 function todayKey(){
@@ -4087,94 +4002,278 @@ function renderRatingChart(){
 }
 window.addEventListener('resize', ()=>{ if(activeTab === 'perfil') renderRatingChart(); });
 
-/* Retrospectiva do ano: cartões estilo "Wrapped" num carrossel */
+/* =====================================================
+   RETROSPECTIVA DO ANO — cartões no formato "stories", feitos
+   com as capas dos próprios filmes (mosaico, fundo desfocado
+   com a cor da capa, textura de película) em vez de degradês.
+   Os filmes importados da planilha não têm data de registro:
+   eles contam como deste ano (foi quando o diário começou).
+===================================================== */
+const WR_MONTHS_SHORT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// Capa de um filme do Diário (enviada à mão ou busca automática)
+function wrPosterSrc(e){
+  if(e.poster) return Promise.resolve(e.poster);
+  return getMovieInfo(lookupOf(e)).then(info => (info && info.found ? info.image : null)).catch(()=> null);
+}
+
+function wrYearItems(year){
+  return diario.filter(e => {
+    const t = e.addedAt || 0;
+    if(t <= REAL_DATE_MIN) return true; // importados da planilha (sem data real)
+    return new Date(t).getFullYear() === year;
+  });
+}
+
 function renderWrapped(){
   const year = new Date().getFullYear();
   document.getElementById('wrappedTitle').textContent = `Retrospectiva ${year}`;
   const el = document.getElementById('profileWrapped');
-  const items = diario.filter(e => (e.addedAt || 0) > REAL_DATE_MIN && new Date(e.addedAt).getFullYear() === year);
+  const items = wrYearItems(year);
   if(!items.length){
     el.innerHTML = `<div class="profile-empty">A retrospectiva de ${year} aparece assim que vocês registrarem filmes este ano.</div>`;
     return;
   }
+
+  // ---------- números ----------
   const cinema = items.filter(e => e.where === 'Cinema').length;
   const casa = items.filter(e => e.where === 'Casa').length;
+  const semLocal = items.length - cinema - casa;
   const rated = items.map(e => ({ e, m: computeMedia(e) })).filter(x => x.m != null).sort((a,b) => b.m - a.m);
-  const best = rated[0];
-  const worst = rated.length > 1 ? rated[rated.length - 1] : null;
+  const best = rated[0] || null;
+  const tiedTop = best ? rated.filter(x => x.m === best.m && x.e !== best.e) : [];
+  const worst = rated.length > 2 ? rated[rated.length - 1] : null;
 
-  const byMonth = {};
-  items.forEach(e => { const m = new Date(e.addedAt).getMonth(); byMonth[m] = (byMonth[m] || 0) + 1; });
-  const topMonth = Object.entries(byMonth).sort((a,b) => b[1] - a[1])[0];
-
-  const genreCount = {};
-  items.forEach(e => entryGenres(e).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }));
-  const topGenreEntry = Object.entries(genreCount).sort((a,b) => b[1] - a[1])[0];
-  const topGenre = topGenreEntry ? genreById(topGenreEntry[0]) : null;
-
-  const clash = items.filter(e => e.notaPaulo != null && e.notaJulia != null)
-    .map(e => ({ e, gap: Math.abs(e.notaPaulo - e.notaJulia) })).sort((a,b) => b.gap - a.gap)[0];
+  const avg = key => { const v = items.map(e => e[key]).filter(n => n != null); return v.length ? v.reduce((a,b)=>a+b,0) / v.length : null; };
+  const avgP = avg('notaPaulo'), avgJ = avg('notaJulia');
   const tensP = items.filter(e => e.notaPaulo === 10).length;
   const tensJ = items.filter(e => e.notaJulia === 10).length;
 
-  const posterOf = e => e.poster ? `<img src="${e.poster}" alt="">` : '';
+  const genreCount = {};
+  items.forEach(e => entryGenres(e).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }));
+  const genres = Object.entries(genreCount).map(([id, n]) => ({ g: genreById(id), n })).filter(x => x.g).sort((a,b) => b.n - a.n);
+
+  const clash = items.filter(e => e.notaPaulo != null && e.notaJulia != null)
+    .map(e => ({ e, gap: Math.abs(e.notaPaulo - e.notaJulia) })).sort((a,b) => b.gap - a.gap)[0];
+  const perfect = rated.filter(x => x.m === 10).map(x => x.e);
+
+  const dated = items.filter(e => (e.addedAt || 0) > REAL_DATE_MIN);
+  const byMonth = Array(12).fill(0);
+  dated.forEach(e => { byMonth[new Date(e.addedAt).getMonth()]++; });
+
+  // ---------- cartões ----------
   const cards = [];
-  cards.push(`
-    <div class="wrapped-card w-total">
-      <span class="w-kicker">${year} em filmes</span>
-      <strong class="w-big">${items.length}</strong>
-      <span class="w-label">filme${items.length === 1 ? '' : 's'} juntos</span>
-      <span class="w-foot">${cinema} no cinema · ${casa} em casa</span>
-    </div>`);
-  if(best) cards.push(`
-    <div class="wrapped-card w-best">
-      <span class="w-kicker">O melhor do ano</span>
-      <div class="w-poster">${posterOf(best.e)}</div>
-      <strong class="w-title">${escapeHtml(best.e.title)}</strong>
-      <span class="w-foot">${iconHtml('star')} ${formatNum(best.m)} de média</span>
-    </div>`);
-  if(topGenre) cards.push(`
-    <div class="wrapped-card w-genre" style="--g:${topGenre.color}">
-      <span class="w-kicker">O gênero de vocês</span>
-      <span class="w-icon">${iconHtml(topGenre.icon)}</span>
-      <strong class="w-title">${escapeHtml(topGenre.label)}</strong>
-      <span class="w-foot">${topGenreEntry[1]} filme${topGenreEntry[1] === 1 ? '' : 's'} este ano</span>
-    </div>`);
-  if(topMonth) cards.push(`
-    <div class="wrapped-card w-month">
-      <span class="w-kicker">Mês mais cinéfilo</span>
-      <strong class="w-big w-cap">${MONTHS_PT[+topMonth[0]]}</strong>
-      <span class="w-foot">${topMonth[1]} filme${topMonth[1] === 1 ? '' : 's'} num mês só</span>
-    </div>`);
-  if(clash && clash.gap > 0) cards.push(`
-    <div class="wrapped-card w-clash">
-      <span class="w-kicker">A maior discórdia</span>
-      <strong class="w-title">${escapeHtml(clash.e.title)}</strong>
-      <span class="w-vs"><span><i class="rate-dot p"></i>${formatNum(clash.e.notaPaulo)}</span><em>vs</em><span><i class="rate-dot j"></i>${formatNum(clash.e.notaJulia)}</span></span>
-      <span class="w-foot">${formatNum(clash.gap)} pontos de diferença</span>
-    </div>`);
-  cards.push(`
-    <div class="wrapped-card w-tens">
-      <span class="w-kicker">Notas 10</span>
-      <span class="w-vs big"><span><i class="rate-dot p"></i>${tensP}</span><em>×</em><span><i class="rate-dot j"></i>${tensJ}</span></span>
-      <span class="w-foot">${tensP === tensJ ? 'Empatados na empolgação' : (tensP > tensJ ? 'Paulo se empolgou mais' : 'Julia se empolgou mais')}</span>
-    </div>`);
-  if(worst && worst.m < (best ? best.m : 10)) cards.push(`
-    <div class="wrapped-card w-worst">
-      <span class="w-kicker">Esse não desceu</span>
-      <strong class="w-title">${escapeHtml(worst.e.title)}</strong>
-      <span class="w-foot">${formatNum(worst.m)} de média</span>
-    </div>`);
+  const posterSlots = []; // { sel, entry, mode: 'img' | 'bg' | 'tint' }
+  let slotId = 0;
+  const slot = (entry, mode) => { const id = 'wrp' + (slotId++); posterSlots.push({ id, entry, mode }); return id; };
 
-  el.innerHTML = `<div class="wrapped-track">${cards.join('')}</div>`;
+  // 1. Abertura: mosaico com as capas do ano
+  const collage = items.slice().sort((a,b) => (computeMedia(b) ?? 0) - (computeMedia(a) ?? 0)).slice(0, 12);
+  const pct = n => (n / items.length * 100).toFixed(1);
+  cards.push(`
+    <article class="wr-card wr-open">
+      <div class="wr-collage">${collage.map(e => `<span id="${slot(e, 'bg')}"></span>`).join('')}</div>
+      <div class="wr-shade"></div>
+      <div class="wr-content">
+        <p class="wr-lead">Em ${year}, vocês viram</p>
+        <strong class="wr-giant">${items.length}</strong>
+        <p class="wr-sub">filmes juntos</p>
+        <div class="wr-split" role="img" aria-label="${cinema} no cinema, ${casa} em casa">
+          ${cinema ? `<span class="s-cinema" style="width:${pct(cinema)}%"></span>` : ''}
+          ${casa ? `<span class="s-casa" style="width:${pct(casa)}%"></span>` : ''}
+          ${semLocal ? `<span class="s-none" style="width:${pct(semLocal)}%"></span>` : ''}
+        </div>
+        <div class="wr-split-legend">
+          <span><i class="s-cinema"></i>${iconHtml('clapperboard')} ${cinema} no cinema</span>
+          <span><i class="s-casa"></i>${iconHtml('sofa')} ${casa} em casa</span>
+        </div>
+      </div>
+    </article>`);
 
-  // Capa do "melhor do ano" sem capa enviada: busca automática
-  const bestPoster = el.querySelector('.w-best .w-poster');
-  if(best && bestPoster && !best.e.poster){
-    getMovieInfo(lookupOf(best.e)).then(info=>{
-      if(info && info.found && info.image) bestPoster.innerHTML = `<img src="${info.image}" alt="" onerror="this.remove()">`;
-    }).catch(()=>{});
+  // 2. O filme do ano
+  if(best){
+    const also = tiedTop.slice(0, 2).map(x => escapeHtml(x.e.title));
+    cards.push(`
+      <article class="wr-card wr-best" id="${slot(best.e, 'tint')}">
+        <div class="wr-bg" id="${slot(best.e, 'bg')}"></div>
+        <div class="wr-shade"></div>
+        <div class="wr-content">
+          <span class="wr-kicker">${iconHtml('trophy')} O filme do ano</span>
+          <div class="wr-poster tilt" id="${slot(best.e, 'img')}"></div>
+          <h4 class="wr-title">${escapeHtml(best.e.title)}</h4>
+          <div class="wr-scoreline">
+            <strong class="wr-score">${formatNum(best.m)}</strong>
+            <span>de média<br><i class="rate-dot p"></i>${formatNum(best.e.notaPaulo)} · <i class="rate-dot j"></i>${formatNum(best.e.notaJulia)}</span>
+          </div>
+          ${also.length ? `<p class="wr-note">Empatados no topo: ${also.join(' e ')}${tiedTop.length > 2 ? ` e mais ${tiedTop.length - 2}` : ''}</p>` : ''}
+        </div>
+      </article>`);
   }
+
+  // 3. O gênero de vocês
+  if(genres.length){
+    const top = genres[0];
+    const shown = genres.slice(0, 5);
+    const total = shown.reduce((s, x) => s + x.n, 0);
+    cards.push(`
+      <article class="wr-card wr-genre" style="--g:${top.g.color}">
+        <div class="wr-glow"></div>
+        <div class="wr-content">
+          <span class="wr-kicker">O gênero de vocês</span>
+          <span class="wr-genre-icon">${iconHtml(top.g.icon)}</span>
+          <h4 class="wr-title big">${escapeHtml(top.g.label)}</h4>
+          <p class="wr-sub">${top.n} de ${items.length} filmes · ${Math.round(top.n / items.length * 100)}%</p>
+          <div class="wr-genre-bar">${shown.map(x => `<span style="width:${(x.n / total * 100).toFixed(1)}%; background:${x.g.color}" title="${escapeHtml(x.g.label)}: ${x.n}"></span>`).join('')}</div>
+          <ul class="wr-genre-list">${shown.map(x => `<li><i style="background:${x.g.color}"></i>${escapeHtml(x.g.label)}<b>${x.n}</b></li>`).join('')}</ul>
+        </div>
+      </article>`);
+  }
+
+  // 4. Duelo: quem é mais exigente
+  if(avgP != null && avgJ != null){
+    const diff = Math.abs(avgP - avgJ);
+    const verdict = diff < 0.05 ? 'Empate técnico na exigência' : `${avgP < avgJ ? 'Paulo' : 'Julia'} é ${avgP < avgJ ? 'o' : 'a'} mais exigente`;
+    cards.push(`
+      <article class="wr-card wr-duel">
+        <div class="wr-content">
+          <span class="wr-kicker">Quem é mais exigente?</span>
+          <div class="wr-duel-grid">
+            <div class="duel p"><span class="duel-name">Paulo</span><strong>${formatNum(avgP)}</strong><span class="duel-cap">média</span></div>
+            <span class="duel-vs">vs</span>
+            <div class="duel j"><span class="duel-name">Julia</span><strong>${formatNum(avgJ)}</strong><span class="duel-cap">média</span></div>
+          </div>
+          <p class="wr-verdict">${verdict}</p>
+          <div class="wr-tens">
+            <span><i class="rate-dot p"></i>${tensP} nota${tensP === 1 ? '' : 's'} 10</span>
+            <span><i class="rate-dot j"></i>${tensJ} nota${tensJ === 1 ? '' : 's'} 10</span>
+          </div>
+        </div>
+      </article>`);
+  }
+
+  // 5. A maior briga
+  if(clash && clash.gap > 0){
+    const e = clash.e;
+    cards.push(`
+      <article class="wr-card wr-clash" id="${slot(e, 'tint')}">
+        <div class="wr-bg" id="${slot(e, 'bg')}"></div>
+        <div class="wr-shade"></div>
+        <div class="wr-content">
+          <span class="wr-kicker">${iconHtml('swords')} A maior briga do ano</span>
+          <h4 class="wr-title">${escapeHtml(e.title)}</h4>
+          <div class="wr-versus">
+            <div class="p"><strong>${formatNum(e.notaPaulo)}</strong><span>Paulo</span></div>
+            <div class="j"><strong>${formatNum(e.notaJulia)}</strong><span>Julia</span></div>
+          </div>
+          <p class="wr-sub">${formatNum(clash.gap)} pontos de diferença</p>
+          ${e.obs ? `<p class="wr-quote">“${escapeHtml(truncate(e.obs, 110))}”</p>` : ''}
+        </div>
+      </article>`);
+  }
+
+  // 6. Os filmes perfeitos (nota 10 dos dois)
+  if(perfect.length){
+    cards.push(`
+      <article class="wr-card wr-perfect">
+        <div class="wr-glow gold"></div>
+        <div class="wr-content">
+          <span class="wr-kicker">${iconHtml('star')} Nota 10 dos dois</span>
+          <strong class="wr-giant small">${perfect.length}</strong>
+          <p class="wr-sub">filme${perfect.length === 1 ? ' perfeito' : 's perfeitos'}</p>
+          <div class="wr-strip">${perfect.slice(0, 6).map(e => `<div class="wr-mini" id="${slot(e, 'img')}" title="${escapeHtml(e.title)}"></div>`).join('')}</div>
+          <p class="wr-note">${perfect.slice(0, 3).map(e => escapeHtml(e.title)).join(' · ')}${perfect.length > 3 ? ' …' : ''}</p>
+        </div>
+      </article>`);
+  }
+
+  // 7. Mês mais cinéfilo (só com filmes que têm data)
+  const monthsUsed = byMonth.map((n, i) => ({ n, i })).filter(x => x.n > 0);
+  if(dated.length >= 3 && monthsUsed.length){
+    const first = monthsUsed[0].i;
+    const last = Math.max(new Date().getMonth(), monthsUsed[monthsUsed.length - 1].i);
+    const range = byMonth.slice(first, last + 1).map((n, k) => ({ n, i: first + k }));
+    const max = Math.max(...range.map(x => x.n));
+    const topM = range.reduce((a, b) => (b.n > a.n ? b : a));
+    cards.push(`
+      <article class="wr-card wr-months">
+        <div class="wr-content">
+          <span class="wr-kicker">${iconHtml('calendar-heart')} Mês mais cinéfilo</span>
+          <h4 class="wr-title big cap">${MONTHS_PT[topM.i]}</h4>
+          <p class="wr-sub">${topM.n} filme${topM.n === 1 ? '' : 's'} num mês só</p>
+          <div class="wr-months-chart">${range.map(x => `
+            <div class="m-col${x.i === topM.i ? ' top' : ''}">
+              <span class="m-val">${x.n || ''}</span>
+              <span class="m-bar" style="height:${max ? Math.max(4, x.n / max * 100) : 4}%"></span>
+              <span class="m-lbl">${WR_MONTHS_SHORT[x.i]}</span>
+            </div>`).join('')}
+          </div>
+          <p class="wr-note">Contando os ${dated.length} filmes registrados com data.</p>
+        </div>
+      </article>`);
+  }
+
+  // 8. Esse não desceu
+  if(worst && best && worst.m < best.m){
+    const e = worst.e;
+    cards.push(`
+      <article class="wr-card wr-worst">
+        <div class="wr-bg gray" id="${slot(e, 'bg')}"></div>
+        <div class="wr-shade"></div>
+        <div class="wr-content">
+          <span class="wr-kicker">Esse não desceu</span>
+          <div class="wr-poster gray" id="${slot(e, 'img')}"></div>
+          <h4 class="wr-title">${escapeHtml(e.title)}</h4>
+          <p class="wr-sub">${formatNum(worst.m)} de média — o mais baixo do ano</p>
+          ${e.obs ? `<p class="wr-quote">“${escapeHtml(truncate(e.obs, 90))}”</p>` : ''}
+        </div>
+      </article>`);
+  }
+
+  // Numeração "1/7" + marca em cada cartão
+  const n = cards.length;
+  const numbered = cards.map((html, i) => html.replace('<div class="wr-content">',
+    `<div class="wr-top"><span>Retrospectiva ${year}</span><span>${i + 1}/${n}</span></div><div class="wr-grain"></div><div class="wr-content">`));
+
+  el.innerHTML = `
+    <div class="wr-carousel">
+      <button type="button" class="wr-nav prev" aria-label="Anterior">${iconHtml('chevron-right')}</button>
+      <div class="wrapped-track">${numbered.join('')}</div>
+      <button type="button" class="wr-nav next" aria-label="Próximo">${iconHtml('chevron-right')}</button>
+    </div>
+    <div class="wr-dots">${numbered.map((_, i) => `<span class="${i === 0 ? 'on' : ''}"></span>`).join('')}</div>`;
+
+  // ---------- capas (assíncrono) ----------
+  posterSlots.forEach(({ id, entry, mode }) => {
+    wrPosterSrc(entry).then(src => {
+      const target = document.getElementById(id);
+      if(!target || !src) return;
+      if(mode === 'img') target.innerHTML = `<img src="${src}" alt="" onerror="this.remove()">`;
+      else if(mode === 'bg') target.style.backgroundImage = `url("${src}")`;
+      else if(mode === 'tint') applyTint(target, src);
+    });
+  });
+
+  // ---------- carrossel: bolinhas + setas ----------
+  const track = el.querySelector('.wrapped-track');
+  const dots = [...el.querySelectorAll('.wr-dots span')];
+  const cardEls = [...track.children];
+  const current = ()=>{
+    const left = track.scrollLeft;
+    let idx = 0, bestD = Infinity;
+    cardEls.forEach((c, i) => { const d = Math.abs(c.offsetLeft - track.offsetLeft - left - 16); if(d < bestD){ bestD = d; idx = i; } });
+    return idx;
+  };
+  let raf = null;
+  track.addEventListener('scroll', ()=>{
+    if(raf) return;
+    raf = requestAnimationFrame(()=>{ raf = null; const i = current(); dots.forEach((d, k) => d.classList.toggle('on', k === i)); });
+  }, { passive: true });
+  const go = (delta)=>{
+    const i = Math.max(0, Math.min(cardEls.length - 1, current() + delta));
+    track.scrollTo({ left: cardEls[i].offsetLeft - track.offsetLeft - 16, behavior: 'smooth' });
+  };
+  el.querySelector('.wr-nav.prev').addEventListener('click', ()=> go(-1));
+  el.querySelector('.wr-nav.next').addEventListener('click', ()=> go(1));
 }
 
 /* =====================================================
