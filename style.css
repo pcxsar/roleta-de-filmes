@@ -45,7 +45,11 @@
 }
 *{box-sizing:border-box;}
 html,body{margin:0; padding:0;}
-html{scroll-behavior:smooth; overflow-x:hidden; overscroll-behavior-x:none; scrollbar-gutter:stable;}
+/* overflow-x:clip (com hidden de reserva p/ navegadores antigos): corta a
+   sobra lateral SEM transformar html/body em áreas de rolagem. Com "hidden"
+   nos dois, o body virava uma segunda área de rolagem e no celular o dedo
+   ficava preso nela (a aba "Nós" travava a rolagem). */
+html{scroll-behavior:smooth; overflow-x:hidden; overflow-x:clip; overscroll-behavior-x:none; scrollbar-gutter:stable;}
 body{
   background:var(--bg) url("https://res.cloudinary.com/dam2gd3fj/image/upload/v1785772320/background-mobile_u8yeyv.png") top center / cover no-repeat scroll;
   color:var(--text);
@@ -56,10 +60,12 @@ body{
   -webkit-tap-highlight-color:transparent;
   position:relative;
   overflow-x:hidden;
+  overflow-x:clip;
   max-width:100vw;
   padding-bottom:calc(var(--nav-h) + 28px + var(--safe-b));
 }
-body:has(.modal-overlay.open){overflow:hidden;}
+/* trava a rolagem da página (no html, que é quem rola) com uma janela aberta */
+html:has(.modal-overlay.open){overflow:hidden;}
 ::selection{background:var(--magenta); color:#12060e;}
 button{font-family:inherit;}
 :focus-visible{outline:2px solid var(--magenta); outline-offset:2px;}
