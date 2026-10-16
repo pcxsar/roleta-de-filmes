@@ -2439,11 +2439,136 @@ function setMovieViewImage(src, title){
 }
 
 /* "Capa que voa": ao abrir um filme, o pôster do card viaja até a tela
-   de leitura (e volta ao fechar). Usa a View Transitions API dos
-   navegadores recentes; onde não existe, abre normal. */
-const canFlyPoster = typeof document.startViewTransition === 'function'
-  && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+   de leitura (e volta ao fechar).
+   Técnica FLIP feita à mão: uma cópia da capa (já carregada, tamanho
+   grande) é animada só com transform/opacity via Web Animations — isso
+   roda no compositor (GPU), sem redesenhar a página a cada quadro.
+   A folha do filme sobe junto, também só com transform/opacity. */
+const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+const FLY_EASE = 'cubic-bezier(.22,.9,.24,1)';
+const FLY_OPEN_MS = 500;
+const FLY_CLOSE_MS = 400;
 let viewOriginPoster = null;
+let flyCleanup = null; // conclui na hora uma animação em andamento
+
+function flyEnabled(){
+  return !reducedMotionQuery.matches && typeof Element.prototype.animate === 'function';
+}
+function finishFlight(){
+  if(!flyCleanup) return;
+  const f = flyCleanup;
+  flyCleanup = null;
+  f();
+}
+// Posição inicial da folha (de baixo no celular, leve zoom no computador)
+function sheetFromTransform(){
+  return window.matchMedia('(min-width:640px)').matches ? 'translateY(14px) scale(.96)' : 'translateY(72px)';
+}
+// Cópia da capa posicionada (fixa) exatamente sobre `rect`
+function makeFlyClone(src, rect){
+  const img = document.createElement('img');
+  img.className = 'fly-poster';
+  img.alt = '';
+  img.decoding = 'sync';
+  img.src = src;
+  img.style.left = rect.left + 'px';
+  img.style.top = rect.top + 'px';
+  img.style.width = rect.width + 'px';
+  img.style.height = rect.height + 'px';
+  document.body.appendChild(img);
+  return img;
+}
+// transform que faz um elemento que está em `to` aparecer em `from`
+function flipTransform(from, to){
+  return `translate3d(${from.left - to.left}px, ${from.top - to.top}px, 0) scale(${from.width / to.width}, ${from.height / to.height})`;
+}
+
+function animateViewOpen(fromPoster, src){
+  finishFlight();
+  const first = fromPoster.getBoundingClientRect();
+  // Abre já no estado final (sem a transição do CSS) pra medir onde a capa vai parar
+  movieViewOverlay.classList.add('no-anim', 'open');
+  const last = movieViewPhoto.getBoundingClientRect();
+  const clone = makeFlyClone(src, last);
+  movieViewPhoto.style.visibility = 'hidden';
+  fromPoster.style.visibility = 'hidden';
+
+  const anims = [
+    clone.animate(
+      [{ transform: flipTransform(first, last) }, { transform: 'none' }],
+      { duration: FLY_OPEN_MS, easing: FLY_EASE }
+    ),
+    movieViewOverlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' }),
+    movieViewCard.animate(
+      [{ transform: sheetFromTransform(), opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: FLY_OPEN_MS - 60, easing: FLY_EASE }
+    ),
+  ];
+  const done = ()=>{
+    anims.forEach(a => a.cancel());
+    clone.remove();
+    movieViewPhoto.style.visibility = '';
+    fromPoster.style.visibility = '';
+    movieViewOverlay.classList.remove('no-anim');
+  };
+  settleFlight(done, anims[0], FLY_OPEN_MS);
+}
+
+// Termina a animação quando ela acabar — ou, por segurança, depois do
+// tempo dela (se o navegador pausar os quadros, a tela não fica presa)
+function settleFlight(done, anim, ms){
+  flyCleanup = done;
+  const end = ()=>{ if(flyCleanup === done){ flyCleanup = null; done(); } };
+  anim.finished.then(end).catch(()=>{});
+  setTimeout(end, ms + 250);
+}
+
+function animateViewClose(back){
+  finishFlight();
+  const photoImg = movieViewPhoto.querySelector('img');
+  const src = photoImg && photoImg.complete && photoImg.naturalWidth ? (photoImg.currentSrc || photoImg.src) : null;
+  const canFly = src && back && back.isConnected && isOnScreen(back);
+  const first = movieViewPhoto.getBoundingClientRect();
+  const target = canFly ? back.getBoundingClientRect() : null;
+  const clone = canFly ? makeFlyClone(src, first) : null;
+  movieViewOverlay.classList.add('no-anim');
+  if(canFly){
+    movieViewPhoto.style.visibility = 'hidden';
+    back.style.visibility = 'hidden';
+  }
+
+  const anims = [
+    movieViewOverlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 280, easing: 'ease-in', fill: 'forwards' }),
+    movieViewCard.animate(
+      [{ transform: 'none', opacity: 1 }, { transform: sheetFromTransform(), opacity: 0 }],
+      { duration: 280, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }
+    ),
+  ];
+  if(clone){
+    anims.unshift(clone.animate(
+      [{ transform: 'none' }, { transform: flipTransform(target, first) }],
+      { duration: FLY_CLOSE_MS, easing: FLY_EASE, fill: 'forwards' }
+    ));
+  }
+  const done = ()=>{
+    movieViewOverlay.classList.remove('open');
+    void movieViewOverlay.offsetWidth; // aplica o "fechado" antes de religar as transições do CSS
+    anims.forEach(a => a.cancel());
+    if(clone) clone.remove();
+    movieViewPhoto.style.visibility = '';
+    if(canFly) back.style.visibility = '';
+    movieViewOverlay.classList.remove('no-anim');
+  };
+  settleFlight(done, anims[0], clone ? FLY_CLOSE_MS : 280);
+}
+
+// Aquece a cor da capa assim que o dedo encosta no card (o clique vem
+// ~100ms depois), pra tela já abrir na cor certa sem repintar no meio.
+document.addEventListener('pointerdown', (ev)=>{
+  const poster = ev.target.closest && ev.target.closest('.movie-card, .mural-card, .fav-slot');
+  const src = loadedImgSrc(originPosterOf(poster));
+  if(src) posterColor(src);
+}, { passive: true });
 
 function originPosterOf(el){
   if(!el) return null;
@@ -2456,26 +2581,6 @@ function loadedImgSrc(posterEl){
 function isOnScreen(el){
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.bottom > 0 && r.top < window.innerHeight;
-}
-let currentFly = null;
-function flyPoster(fromEl, toEl, update){
-  // Uma animação ainda rodando (clique rápido): conclui ela na hora
-  if(currentFly){ currentFly.skipTransition(); currentFly = null; }
-  if(!canFlyPoster || !fromEl || !toEl || !fromEl.isConnected || !isOnScreen(fromEl)){ update(); return; }
-  fromEl.style.viewTransitionName = 'poster-fly';
-  document.documentElement.classList.add('vt-poster');
-  const t = document.startViewTransition(()=>{
-    fromEl.style.viewTransitionName = '';
-    toEl.style.viewTransitionName = 'poster-fly';
-    update();
-  });
-  currentFly = t;
-  t.finished.finally(()=>{
-    fromEl.style.viewTransitionName = '';
-    toEl.style.viewTransitionName = '';
-    document.documentElement.classList.remove('vt-poster');
-    if(currentFly === t) currentFly = null;
-  });
 }
 
 function openMovieView(entry, kind, originEl){
@@ -2567,7 +2672,13 @@ function openMovieView(entry, kind, originEl){
 
   movieViewMarkWatchedBtn.style.display = kind === 'watchlist' ? 'flex' : 'none';
 
-  flyPoster(fromPoster, movieViewPhoto, ()=> movieViewOverlay.classList.add('open'));
+  const flySrc = loadedImgSrc(fromPoster);
+  if(flyEnabled() && fromPoster && flySrc && isOnScreen(fromPoster)){
+    animateViewOpen(fromPoster, flySrc);
+  } else {
+    finishFlight();
+    movieViewOverlay.classList.add('open');
+  }
 }
 // instant=true quando a tela fecha pra abrir outra (editar, mover pro Diário):
 // aí a capa não volta voando pro card.
@@ -2577,7 +2688,12 @@ function closeMovieView(instant){
   viewingMovieEntry = null;
   viewingMovieKind = null;
   if(!movieViewOverlay.classList.contains('open')) return;
-  flyPoster(back ? movieViewPhoto : null, back, ()=> movieViewOverlay.classList.remove('open'));
+  if(instant === true || !flyEnabled()){
+    finishFlight();
+    movieViewOverlay.classList.remove('open');
+    return;
+  }
+  animateViewClose(back);
 }
 movieViewClose.addEventListener('click', closeMovieView);
 movieViewOverlay.addEventListener('click', (e)=>{ if(e.target === movieViewOverlay) closeMovieView(); });

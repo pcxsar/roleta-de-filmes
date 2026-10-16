@@ -41,7 +41,7 @@
 }
 *{box-sizing:border-box;}
 html,body{margin:0; padding:0;}
-html{scroll-behavior:smooth; overflow-x:hidden; overscroll-behavior-x:none;}
+html{scroll-behavior:smooth; overflow-x:hidden; overscroll-behavior-x:none; scrollbar-gutter:stable;}
 body{
   background:var(--bg) url("https://res.cloudinary.com/dam2gd3fj/image/upload/v1785772320/background-mobile_u8yeyv.png") top center / cover no-repeat scroll;
   color:var(--text);
@@ -1102,9 +1102,9 @@ footer .heart{color:var(--magenta);}
    janela centralizada em telas maiores ---------- */
 .modal-overlay{
   position:fixed; inset:0;
-  background:rgba(4,3,10,.72);
-  -webkit-backdrop-filter:blur(6px);
-  backdrop-filter:blur(6px);
+  /* sem backdrop-filter: desfocar a página inteira a cada quadro da
+     animação de abrir/fechar era o que mais travava no celular */
+  background:rgba(4,3,10,.8);
   display:flex;
   flex-direction:column;
   z-index:70;
@@ -1369,7 +1369,7 @@ footer .heart{color:var(--magenta);}
 .view-meta span{display:inline-flex; align-items:center; gap:5px;}
 .view-meta-media{color:var(--gold); font-weight:700;}
 .view-meta-media .icon{fill:currentColor;}
-.view-card .modal-close{background:rgba(7,6,15,.5); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); color:var(--text);}
+.view-card .modal-close{background:rgba(7,6,15,.62); color:var(--text);}
 .view-body{padding:4px 20px 0;}
 @media (min-width:640px){
   .view-hero{padding:32px 26px 20px;}
@@ -1807,20 +1807,21 @@ header{position:relative;}
 .result{transition:opacity 450ms var(--ease-out), transform 450ms var(--ease-out), background .5s ease, border-color .5s ease;}
 
 /* =====================================================
-   Capa que voa (View Transitions)
+   Capa que voa (FLIP com Web Animations, só transform/opacity)
 ===================================================== */
-html.vt-poster .modal-overlay,
-html.vt-poster .modal-card{transition:none !important;}
-::view-transition-group(poster-fly){
-  animation-duration:460ms;
-  animation-timing-function:cubic-bezier(.2,.85,.25,1);
-}
-::view-transition-old(poster-fly),
-::view-transition-new(poster-fly){
-  height:100%;
+.fly-poster{
+  position:fixed;
+  z-index:250;
+  margin:0;
   object-fit:cover;
-  overflow:clip;
-  border-radius:12px;
+  border-radius:11px;
+  transform-origin:0 0;
+  will-change:transform;
+  pointer-events:none;
+  box-shadow:0 22px 44px -16px rgba(0,0,0,.8);
+  backface-visibility:hidden;
 }
-::view-transition-old(root),
-::view-transition-new(root){animation-duration:300ms;}
+/* Durante a animação feita via JS, desliga as transições do CSS da folha */
+.modal-overlay.no-anim,
+.modal-overlay.no-anim .modal-card{transition:none !important;}
+.modal-overlay.no-anim .modal-card{will-change:transform, opacity;}
